@@ -17,12 +17,12 @@ command:
 
  - v  - display the currently installed version of the game
  - u  - check for updates
-	 - -i - install update (patch)
+	 - ~~-i - install update (patch)~~ in dev
 	 - -f - install update (full)
- - ~~c  - check local files for compliance in~~ dev
+ - ~~c  - check local files for compliance~~ in dev
 
 #### examples:
-Check update and exit:     `./launcher.sh u`
-~~Check update and install:    `./launcher.sh u -i`~~ in dev
-Full install latest version:    `./launcher.sh u -f`
-Full install version 2.17.7:  `./launcher.sh u -f 2.17.7`
+Check update and exit:     `./launcher.sh u`  
+~~Check update and install:    `./launcher.sh u -i`~~ in dev  
+Full install latest version:    `./launcher.sh u -f`  
+Full install version 2.17.7:  `./launcher.sh u -f 2.17.7`  
