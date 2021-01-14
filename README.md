@@ -21,6 +21,7 @@ command:
 	 - ~~-i - install update (patch)~~ in dev
 	 - -f - install update (full)
  - ~~c  - check local files for compliance~~ in dev
+ - n  - create new wineprefix and installing dependencies (need winetrics)
 
 #### examples:
 Check update and exit:     `./launcher.sh u`  
@@ -32,4 +33,4 @@ Full install version 2.17.7:  `./launcher.sh u -f 2.17.7`
 ## Wine
 To successfully launch the game for wine, install:
  - d3dx9, d3dcompiler_43 from WineTricks
- - [PhysX legacy](https://www.nvidia.com/en-us/drivers/physx/physx-9-13-0604-legacy-driver/)
+ - [PhysX legacy](https://www.nvidia.com/en-us/drivers/physx/physx-9-13-0604-legacy-driver/) (`winetricks -q PhysxLegacy.verb`)
