@@ -3,6 +3,7 @@
 ## Dependencies
  - curl 
  - wget
+ - winetrics (optional)
 
 ## Install
 1. Put the files in the game folder.  
@@ -16,6 +17,7 @@ You can run from any folder, but then write the path to the game in variable `po
     launcher.sh [command] <args>
 command:
 
+ - r  - run game
  - v  - display the currently installed version of the game
  - u  - check for updates
 	 - ~~-i - install update (patch)~~ in dev

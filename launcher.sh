@@ -1,26 +1,32 @@
 #!/bin/bash
 
+#### EDIT THIS SETTINGS ####
+
+potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+#potbs_wineprefix="$HOME/PotBS"
+potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
+
+
+#### NOT EDIT ##############
+
 # полный путь до скрипта
 abs_filename=$(readlink -e "$0")
 # каталог в котором лежит скрипт
 work_dir=$(dirname "$abs_filename")
 script_name=${0##*/}
 
-
-potbs_wineprefix="$HOME/PotBS"
-potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
-#potbs_dir="${work_dir}"
 potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
 buildsversion="${work_dir}/builds"
-jq="./jq-linux64"
+jq="${work_dir}/jq-linux64"
 
 
-
+######################################################
 
 help(){
     cat << EOF
 $script_name [command] <args>
 command:
+    r  run game
     v  display the currently installed version of the game
     u  check for updates
         -i install update (patch)
@@ -53,8 +59,8 @@ fullinstall(){
     else
         build=$1
     fi
-    echo "install version: ${build}"
-
+    echo "Install PotBS version: ${build}"
+    echo "to: ${potbs_dir}"
     #wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -o wget.txt  -P "${potbs_dir}/test" --reject="index.html*" "${potbs_url}/Builds/${build}/"
     wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -P "${potbs_dir}" --reject="index.html*" "${potbs_url}/Builds/${build}/"
     if [ $? -eq 0 ];then
@@ -231,15 +237,36 @@ createwineprefix(){
 
     echo "Wineprefix create success!"
     echo ""
-    echo "Install game:"
-    echo "$0 i -f"
-    echo ""
-    echo "Run game:"
-    echo "cd ${potbs_dir}"
-    echo "env WINEPREFIX=\"${potbs_wineprefix}\" wine PotBS.exe"
-    echo ""
-    read -p "Any key to continue"
+    while true; do
+        read -p "Download Full Game?" yn
+        case $yn in
+            [Yy]* ) 
+                fullinstall()
+                break;;
+            [Nn]* ) break;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
+
+    #read -p "Any key to continue"
     return
+
+}
+
+rungame(){
+    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | ${jq} -r '.["AvailableBuilds"] | .[-1]')
+    currenthash=$(cat "${potbs_dir}/version.data")
+    buildhash=$(curl -s "${potbs_url}/Builds/${lastbuild}/version.data")
+
+    if [ "${currenthash}" != "${buildhash}" ];then
+        echo "Current version NOT updated"
+        read -p "Any key to exit"
+        return
+    fi
+
+    cd ${potbs_dir}
+    WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
+
 
 }
 #####################################################################################
@@ -253,10 +280,7 @@ then
 fi
 
 case "$1" in
-    v)
-        getlocalversion
-        exit 0
-    ;;
+    v) getlocalversion;;
     u)
         # if not args, only check
         if [ -z $2 ];then
@@ -278,13 +302,10 @@ case "$1" in
             done
         fi
     ;;
-    c)
-        checklocalfiles
-    ;;
+    c) checklocalfiles;;
     n) createwineprefix;;
-    *)  help
-        exit 0
-    ;;
+    r) rungame;;
+    *) help;;
 esac
 
 exit 0
