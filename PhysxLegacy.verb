@@ -1,0 +1,15 @@
+w_metadata PhysxLegacy apps \
+    title="NVIDIA PhysX Legacy System Software" \
+    publisher="NVIDIA" \
+    year="2013" \
+    media="download" \
+    file1="PhysX-9.13.0604-SystemSoftware-Legacy.msi" \
+
+load_PhysxLegacy()
+{
+    w_download http://us.download.nvidia.com/Windows/9.13.0604/${file1} 2b78df4a9004f5c4220d62c363709e5ac5e2e58df9f2284df0254cbfa4970d91
+    #w_try_unzip "${W_PROGRAMS_X86_UNIX}" "${W_CACHE}/${W_PACKAGE}/${file1}"
+    w_try_cd "${W_TMP}"
+    w_try "${WINE}" msiexec /i "${W_CACHE}/${W_PACKAGE}/${file1}" ${W_OPT_UNATTENDED:+/q}
+}
+

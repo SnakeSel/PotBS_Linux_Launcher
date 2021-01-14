@@ -6,11 +6,14 @@ abs_filename=$(readlink -e "$0")
 work_dir=$(dirname "$abs_filename")
 script_name=${0##*/}
 
-#potbs_dir="$HOME/PotBS"
-potbs_dir="${work_dir}"
+
+potbs_wineprefix="$HOME/PotBS"
+potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
+#potbs_dir="${work_dir}"
 potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
 buildsversion="${work_dir}/builds"
 jq="./jq-linux64"
+
 
 
 
@@ -23,6 +26,7 @@ command:
         -i install update (patch)
         -f install update (full)
     c  check local files for compliance
+    n  create new wineprefix
 
 examples:
 
@@ -91,6 +95,12 @@ checkupdate(){
 
 getlocalversion(){
     localhash=$(cat "${potbs_dir}/version.data")
+    if [ $? -ne 0 ];then
+        echo "[ERR] Not found: ${potbs_dir}/version.data"
+        echo "Maybe Game not installed?"
+        return
+    fi
+
 
     # if version number is in the file $localhash, return it
     if [ -f "${buildsversion}" ];then
@@ -170,6 +180,68 @@ checklocalfiles(){
 
 
 }
+
+
+createwineprefix(){
+    winever=$(wine --version)
+    if [ $? -ne 0 ];then
+        echo "[ERR] Wine not found"
+        read -p "Any key to continue"
+        return
+    fi
+
+    echo "Create new wineprefix ${winever}"
+    echo "Enter patch to wineprefix or empty to default"
+    read -p "(default patch: ${potbs_wineprefix}) :" ptch
+    if [ "${ptch}" != "" ];then
+        potbs_wineprefix=${ptch}
+    fi
+
+    echo "Init wine to ${potbs_wineprefix}"
+
+    WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
+    #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    if [ $? -ne 0 ];then
+        echo "[ERR] Create wineprefix"
+        read -p "Any key to continue"
+        return
+    fi
+
+    winetriksver=$(winetricks -V | cut -d' ' -f1)
+    if [ $? -ne 0 ];then
+        echo "[Warn] No winetrics found"
+        echo "Manual install d3dx9 d3dcompiler_43 vcrun2019 PhysX"
+        read -p "Any key to continue"
+        return
+    fi
+
+    WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43 vcrun2019
+    if [ $? -ne 0 ];then
+        echo "[ERR] no install d3dx9 d3dcompiler_43 vcrun2019"
+        read -p "Any key to continue"
+        return
+    fi
+
+    WINEPREFIX="${potbs_wineprefix}" winetricks -q ${work_dir}/PhysxLegacy.verb
+    if [ $? -ne 0 ];then
+        echo "[ERR] no install PhysX"
+        read -p "Any key to continue"
+        return
+    fi
+
+    echo "Wineprefix create success!"
+    echo ""
+    echo "Install game:"
+    echo "$0 i -f"
+    echo ""
+    echo "Run game:"
+    echo "cd ${potbs_dir}"
+    echo "env WINEPREFIX=\"${potbs_wineprefix}\" wine PotBS.exe"
+    echo ""
+    read -p "Any key to continue"
+    return
+
+}
 #####################################################################################
 
 #Если параметр 1 не существует, ошибка
@@ -209,6 +281,7 @@ case "$1" in
     c)
         checklocalfiles
     ;;
+    n) createwineprefix;;
     *)  help
         exit 0
     ;;
