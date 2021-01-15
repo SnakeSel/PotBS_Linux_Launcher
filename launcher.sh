@@ -2,8 +2,8 @@
 
 #### EDIT THIS SETTINGS ####
 
-#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-potbs_wineprefix="$HOME/PotBS"
+potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+#potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 
@@ -160,12 +160,11 @@ getlocalversion(){
 
 
 checklocalfiles(){
+    build=$(getlocalversion)
 
-    if [ -z $1 ];then
-        build=$(getlocalversion)
-    else
-        build=$1
-    fi
+    #if [ -z $1 ];then
+    #else
+    #fi
 
     # create md5sum check file
     curl -s "${potbs_url}/Builds/build_${build}.json" | ${jq} -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
