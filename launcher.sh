@@ -2,8 +2,8 @@
 
 #### EDIT THIS SETTINGS ####
 
-potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-#potbs_wineprefix="$HOME/PotBS"
+#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 
@@ -18,6 +18,7 @@ script_name=${0##*/}
 potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
 buildsversion="${work_dir}/builds"
 jq="${work_dir}/jq-linux64"
+hash="${work_dir}/potbs_hash"
 
 
 ######################################################
@@ -44,9 +45,6 @@ Check update and install:
 
 Full install latest version:
     $script_name u -f
-
-Full install version 2.17.7:
-    $script_name u -f 2.17.7
 
 EOF
 }
@@ -162,8 +160,6 @@ getlocalversion(){
 
 
 checklocalfiles(){
-    echo "in dev"
-    return
 
     if [ -z $1 ];then
         build=$(getlocalversion)
@@ -172,9 +168,10 @@ checklocalfiles(){
     fi
 
     # create md5sum check file
-    curl -s "${potbs_url}/Builds/build_${build}.json" | ${jq} -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "md5sum_${build}"
+    curl -s "${potbs_url}/Builds/build_${build}.json" | ${jq} -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
 
-    #md5sum -c "md5sum_${build}"
+    cd ${potbs_dir}
+    ${hash} -c "${work_dir}/hashsum_${build}" | grep "FAIL"
 #    fl=$(md5sum -c "md5sum_${build}" 2>&1)
     #if [ $? -eq 0 ]; then
     #    echo "No corrupted file"
@@ -183,7 +180,7 @@ checklocalfiles(){
 #        echo "$fl" | grep "ПОВРЕЖ"
 #    fi
 
-
+    cd "${work_dir}"
 
 }
 
@@ -205,8 +202,8 @@ createwineprefix(){
 
     echo "Init wine to ${potbs_wineprefix}"
 
-    WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
-    #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
+    WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" wineboot --init
     if [ $? -ne 0 ];then
         echo "[ERR] Create wineprefix"
         read -p "Any key to continue"
@@ -240,8 +237,8 @@ createwineprefix(){
     while true; do
         read -p "Download Full Game?" yn
         case $yn in
-            [Yy]* ) 
-                fullinstall()
+            [Yy]* )
+                fullinstall
                 break;;
             [Nn]* ) break;;
             * ) echo "Please answer yes or no.";;

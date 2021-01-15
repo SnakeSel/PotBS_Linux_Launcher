@@ -22,7 +22,7 @@ command:
  - u  - check for updates
 	 - ~~-i - install update (patch)~~ in dev
 	 - -f - install update (full)
- - ~~c  - check local files for compliance~~ in dev
+ - c  - check local files for compliance
  - n  - create new wineprefix and installing dependencies (need winetrics)
 
 #### examples:
