@@ -6,6 +6,8 @@ potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
 #potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
+# win64 | win32
+WINEARCH=win32
 
 #### NOT EDIT ##############
 
@@ -17,6 +19,7 @@ script_name=${0##*/}
 
 potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
 buildsversion="${work_dir}/builds"
+corruptedfiles="${work_dir}/corrupted"
 jq="${work_dir}/jq-linux64"
 hash="${work_dir}/potbs_hash"
 
@@ -177,28 +180,40 @@ checklocalfiles(){
     build=$(getlocalversion)
 
     echo "Checking files started..."
-    #if [ -z $1 ];then
-    #else
-    #fi
 
-    # create md5sum check file
     curl -s "${potbs_url}/Builds/build_${build}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
 
     cd "${potbs_dir}" || exit
-    "${hash}" -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${work_dir}/failfile"
 
-#    fl=$(md5sum -c "md5sum_${build}" 2>&1)
-    #if [ $? -eq 0 ]; then
-    #    echo "No corrupted file"
-    #else
-#        echo "!!! file corrupted"
-#        echo "$fl" | grep "ПОВРЕЖ"
-#    fi
+    "${hash}" -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${corruptedfiles}"
+#    if [ $? -eq 0 ]; then
+    if [ ! -s ${corruptedfiles} ];then
+        echo "No corrupted file"
+        rm "${corruptedfiles}"
+        cd "${work_dir}" || exit
+        return
+    fi
 
     cd "${work_dir}" || exit
 
+    while true; do
+        read -p "Download corrupted file? (y\n)" yn
+        case $yn in
+            [Yy]* )
+                while read LINE;do
+                    fullfile=$(echo "$LINE" | awk '{ print $2 }')
+                    #filename=$(basename "$fullfile")
+                    filedir=$(dirname "$fullfile")
+                    rm "${potbs_dir}/${fullfile}"
+                    wget -c -nH --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+                done < "${corruptedfiles}"
 
-    #wget -c -nH --show-progress -P "${potbs_dir}" "${potbs_url}/Builds/${build}/"
+                break;;
+            [Nn]* ) break;;
+            * ) echo "Please answer yes or no.";;
+        esac
+    done
+
 }
 
 
@@ -220,7 +235,7 @@ createwineprefix(){
     echo "Init wine to ${potbs_wineprefix}"
 
     #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
-    WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" wineboot --init
     if [ $? -ne 0 ];then
         echo "[ERR] Create wineprefix"
         read -p "Any key to continue"
@@ -279,7 +294,7 @@ rungame(){
     fi
 
     cd "${potbs_dir}"
-    WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
+    WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
 
 
 }
