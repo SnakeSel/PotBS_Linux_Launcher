@@ -1,13 +1,15 @@
 
-# PotBS_Linux_Launcher
+# PotBS Linux Launcher
+Script to simplify wine environment creation, download, run game and check for updates.
+
 ## Dependencies
  - curl 
  - wget
  - winetrics (optional)
 
 ## Install
-1. Put the files in the game folder.  
-You can run from any folder, but then write the path to the game in variable `potbs_dir`
+1. Set the variable `potbs_wineprefix` of your choice.  
+	If the game is already installed, check the correct path in the variable `potbs_dir` (defauilt: "${potbs_wineprefix}/drive_c/PotBS")
 2. Grant execution rights for files: `chmod +x launcher.sh jq-linux64 potbs_hash`
 3. Run `./launcher.sh`
 
