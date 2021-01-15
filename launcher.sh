@@ -4,7 +4,8 @@
 
 potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
 #potbs_wineprefix="$HOME/PotBS"
-potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
+#potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
+potbs_dir="${potbs_wineprefix}/drive_c/Program Files/PotBS"
 
 
 #### NOT EDIT ##############
@@ -20,6 +21,7 @@ buildsversion="${work_dir}/builds"
 jq="${work_dir}/jq-linux64"
 hash="${work_dir}/potbs_hash"
 
+debug=1
 
 ######################################################
 
@@ -105,6 +107,10 @@ getlocalversion(){
         return
     fi
 
+    if [ $debug ];then
+        echo "[DBG] localhash = ${localhash}"
+    fi
+
 
     # if version number is in the file $localhash, return it
     if [ -f "${buildsversion}" ];then
@@ -126,7 +132,7 @@ getlocalversion(){
     echo "recreate Builds file"
 
     # if version nomber not in file, recreate file
-    echo "File create: $(date +'%Y-%m-%d %H:%M:%S')" > ${buildsversion}
+    echo "File create: $(date +'%Y-%m-%d %H:%M:%S')" > "${buildsversion}"
 
     # get an array of all versions
     oldIFS=$IFS
@@ -134,18 +140,27 @@ getlocalversion(){
     read -r -a allbuilds <<< "$(curl -s "${potbs_url}/Builds/builds_index.json" | ${jq} -r -c '.["AvailableBuilds"]' | sed 's/\[//' | sed 's/]//' | sed 's/"//g')"
     IFS=$oldIFS
 
+    if [ $debug ];then
+        echo "[DBG] read allbuilds finish"
+    fi
+
     #
     for build in "${allbuilds[@]}"; do
         buildhash=$(curl -s "${potbs_url}/Builds/${build}/version.data")
 
         echo "${buildhash}" | grep "Not Found" > /dev/null
         if [ $? -eq 0 ];then
-            #echo "Version ${build} not found"
+            if [ $debug ];then
+                echo "[DBG] Version ${build} not found"
+            fi
             continue
         fi
 
         if [ "${localhash}" = "${buildhash}" ];then
             result="${build}"
+        fi
+        if [ $debug ];then
+            echo "[DBG] $build=${buildhash}"
         fi
         echo "$build=${buildhash}" >> ${buildsversion}
     done
@@ -162,6 +177,7 @@ getlocalversion(){
 checklocalfiles(){
     build=$(getlocalversion)
 
+    echo "Checking files started..."
     #if [ -z $1 ];then
     #else
     #fi
@@ -169,8 +185,9 @@ checklocalfiles(){
     # create md5sum check file
     curl -s "${potbs_url}/Builds/build_${build}.json" | ${jq} -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
 
-    cd ${potbs_dir}
-    ${hash} -c "${work_dir}/hashsum_${build}" | grep "FAIL"
+    cd "${potbs_dir}"
+    ${hash} -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${work_dir}/failfile"
+
 #    fl=$(md5sum -c "md5sum_${build}" 2>&1)
     #if [ $? -eq 0 ]; then
     #    echo "No corrupted file"
@@ -181,6 +198,8 @@ checklocalfiles(){
 
     cd "${work_dir}"
 
+
+    #wget -c -nH --show-progress -P "${potbs_dir}" "${potbs_url}/Builds/${build}/"
 }
 
 
@@ -260,7 +279,7 @@ rungame(){
         return
     fi
 
-    cd ${potbs_dir}
+    cd "${potbs_dir}"
     WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
 
 
@@ -273,6 +292,10 @@ then
     #echo "Error. Неверные параметры."
     help
     exit 0
+fi
+
+if [ $debug ];then
+    echo "[DBG] version 20210115"
 fi
 
 case "$1" in
