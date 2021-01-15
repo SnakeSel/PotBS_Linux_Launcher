@@ -4,8 +4,7 @@
 
 potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
 #potbs_wineprefix="$HOME/PotBS"
-#potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
-potbs_dir="${potbs_wineprefix}/drive_c/Program Files/PotBS"
+potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 
 #### NOT EDIT ##############
@@ -21,7 +20,7 @@ buildsversion="${work_dir}/builds"
 jq="${work_dir}/jq-linux64"
 hash="${work_dir}/potbs_hash"
 
-debug=1
+#debug=1
 
 ######################################################
 
@@ -55,7 +54,7 @@ EOF
 # Full dowload potbs $1 version
 fullinstall(){
     if [ -z "$1" ];then
-        build=$(curl -s "${potbs_url}/Builds/builds_index.json" | ${jq} -r '.["AvailableBuilds"] | .[-1]')
+        build=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
     else
         build=$1
     fi
@@ -77,7 +76,7 @@ patchinstall(){
 
 checkupdate(){
     echo "Check update version"
-    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | ${jq} -r '.["AvailableBuilds"] | .[-1]')
+    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
     echo "Last Build: ${lastbuild}"
 
     currenthash=$(cat "${potbs_dir}/version.data")
@@ -137,7 +136,7 @@ getlocalversion(){
     # get an array of all versions
     oldIFS=$IFS
     IFS=', ' # разделитель запятая или пробел
-    read -r -a allbuilds <<< "$(curl -s "${potbs_url}/Builds/builds_index.json" | ${jq} -r -c '.["AvailableBuilds"]' | sed 's/\[//' | sed 's/]//' | sed 's/"//g')"
+    read -r -a allbuilds <<< "$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r -c '.["AvailableBuilds"]' | sed 's/\[//' | sed 's/]//' | sed 's/"//g')"
     IFS=$oldIFS
 
     if [ $debug ];then
@@ -162,7 +161,7 @@ getlocalversion(){
         if [ $debug ];then
             echo "[DBG] $build=${buildhash}"
         fi
-        echo "$build=${buildhash}" >> ${buildsversion}
+        echo "$build=${buildhash}" >> "${buildsversion}"
     done
 
     if [ "${result}" != "" ];then
@@ -183,10 +182,10 @@ checklocalfiles(){
     #fi
 
     # create md5sum check file
-    curl -s "${potbs_url}/Builds/build_${build}.json" | ${jq} -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
+    curl -s "${potbs_url}/Builds/build_${build}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
 
-    cd "${potbs_dir}"
-    ${hash} -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${work_dir}/failfile"
+    cd "${potbs_dir}" || exit
+    "${hash}" -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${work_dir}/failfile"
 
 #    fl=$(md5sum -c "md5sum_${build}" 2>&1)
     #if [ $? -eq 0 ]; then
@@ -196,7 +195,7 @@ checklocalfiles(){
 #        echo "$fl" | grep "ПОВРЕЖ"
 #    fi
 
-    cd "${work_dir}"
+    cd "${work_dir}" || exit
 
 
     #wget -c -nH --show-progress -P "${potbs_dir}" "${potbs_url}/Builds/${build}/"
@@ -269,7 +268,7 @@ createwineprefix(){
 }
 
 rungame(){
-    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | ${jq} -r '.["AvailableBuilds"] | .[-1]')
+    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
     currenthash=$(cat "${potbs_dir}/version.data")
     buildhash=$(curl -s "${potbs_url}/Builds/${lastbuild}/version.data")
 
