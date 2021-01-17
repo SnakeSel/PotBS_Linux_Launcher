@@ -13,10 +13,6 @@ Script to simplify wine environment creation, download, run game and check for u
 2. Grant execution rights for files: `chmod +x launcher.sh jq-linux64 potbs_hash`
 3. Run `./launcher.sh`
 
-#### Example clean install:
-1. Create new wineprefix and installing dependencies: `./launcher.sh n`
-2. Download Game: `./launcher.sh u -f`
-3. Run game: `./launcher.sh r`
 
 ## Usage
 
@@ -31,9 +27,14 @@ command:
  - c  - check local files for compliance
  - n  - create new wineprefix and installing dependencies (need winetrics)
 
+#### Example clean install:
+1. Create new wineprefix and installing dependencies: `./launcher.sh n`
+2. Download Game: `./launcher.sh u -f`
+3. Run game: `./launcher.sh r`
+
 #### examples:
 Check update and exit:     `./launcher.sh u`  
-~~Check update and install:    `./launcher.sh u -i`~~ in dev  
+Check update and install:    `./launcher.sh u -i`  
 Full install latest version:    `./launcher.sh u -f`  
 Full install version 2.17.7:  `./launcher.sh u -f 2.17.7`  
 
