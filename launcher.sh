@@ -377,6 +377,18 @@ rungame(){
 
 
 }
+
+downloadLocale(){
+    echo "Download Updated RU locale"
+
+    rm "${potbs_dir}/locale/ru_ru_data.dat"
+    wget -c -nH --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/blob/master/ru_ru_data.dat"
+
+    rm "${potbs_dir}/locale/ru_ru_data.dir"
+    wget -c -nH --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/blob/master/ru_ru_data.dir"
+
+}
+
 #####################################################################################
 
 #Если параметр 1 не существует, ошибка
@@ -420,6 +432,7 @@ case "$1" in
     c) checklocalfiles;;
     n) createwineprefix;;
     r) rungame;;
+    l) downloadLocale;;
     *) help;;
 esac
 
