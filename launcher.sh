@@ -2,8 +2,8 @@
 
 #### EDIT THIS SETTINGS ####
 
-potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-#potbs_wineprefix="$HOME/PotBS"
+#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 # win64 | win32
@@ -73,8 +73,85 @@ fullinstall(){
 
 }
 
+# since applying patches requires a separate application, then
+# read the modified files and download them entirely
+# 
+# Patch Operation:
+# 0 = no change
+# 1 = deleted
+# 2 = updated
+# 3 = changed attributes
+# 4 = added
 patchinstall(){
-    echo "in dev"
+    build=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
+    localbuild=$(getlocalversion)
+
+    if [ "$debug" ];then
+        localbuild="2.17.7"
+        echo "[DBG] localbuild=${localbuild}"
+    fi
+
+    if [ "$localbuild" == "$build" ];then
+        echo "Update not required."
+        return
+    fi
+
+    echo "Cheking patch ${localbuild} to ${build}"
+    patchlist=$(curl -s "${potbs_url}/Patches/${localbuild}_${build}.json")
+    echo "${patchlist}" | grep "Not Found" > /dev/null
+    if [ $? -eq 0 ];then
+        echo "[ERR] Patch ${localbuild}_${build}.json not found"
+        exit 1
+    fi
+
+    pathDel=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==1) | .RelativePath')
+    if [ "$debug" ];then
+        echo "[DBG] pathDel:"
+        echo "${pathDel}"
+
+    fi
+
+    pathUpdate=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==2) | .RelativePath')
+    if [ "$debug" ];then
+        echo "[DBG] pathUpdate:"
+        echo "$pathUpdate"
+    fi
+
+    pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
+    if [ "$debug" ];then
+        echo "[DBG] pathAdd:"
+        echo "$pathAdd"
+    fi
+
+    echo "Apply the patch"
+
+    echo "Remove deleted files..."
+    while read -r LINE;do
+        if [ "$LINE" == "" ];then
+            continue
+        fi
+        rm "${potbs_dir}/${LINE}"
+    done < <(printf '%s\n' "${pathDel}")
+
+    echo "Remove old and download updated files"
+    while read -r fullfile;do
+        if [ "$fullfile" == "" ];then
+            continue
+        fi
+        filedir=$(dirname "$fullfile")
+        rm "${potbs_dir}/${fullfile}"
+        wget -c -nH --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+    done < <(printf '%s\n' "$pathUpdate")
+
+    echo "Download added files"
+    while read -r fullfile;do
+        filedir=$(dirname "$fullfile")
+        wget -c -nH --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+    done < <(printf '%s\n' "${pathAdd}")
+
+
+    echo "patch apply finished"
+
 }
 
 checkupdate(){
@@ -85,13 +162,11 @@ checkupdate(){
     currenthash=$(cat "${potbs_dir}/version.data")
     buildhash=$(curl -s "${potbs_url}/Builds/${lastbuild}/version.data")
 
-#for test
-#currenthash=="12313"
     if [ "${currenthash}" = "${buildhash}" ];then
         echo "Current version last updated"
         #read -p "Any key to exit"
-        #exit 0
-        return
+        exit 0
+        #return
     fi
 
     carrent=$(getlocalversion)
@@ -109,10 +184,9 @@ getlocalversion(){
         return
     fi
 
-    if [ $debug ];then
-        echo "[DBG] localhash = ${localhash}"
-    fi
-
+    #if [ $debug ];then
+    #    echo "[DBG] localhash = ${localhash}"
+    #fi
 
     # if version number is in the file $localhash, return it
     if [ -f "${buildsversion}" ];then
@@ -187,7 +261,7 @@ checklocalfiles(){
 
     "${hash}" -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${corruptedfiles}"
 #    if [ $? -eq 0 ]; then
-    if [ ! -s ${corruptedfiles} ];then
+    if [ ! -s "${corruptedfiles}" ];then
         echo "No corrupted file"
         rm "${corruptedfiles}"
         cd "${work_dir}" || exit
@@ -197,10 +271,10 @@ checklocalfiles(){
     cd "${work_dir}" || exit
 
     while true; do
-        read -p "Download corrupted file? (y\n)" yn
+        read -r -p "Download corrupted file? (y\n):" yn
         case $yn in
             [Yy]* )
-                while read LINE;do
+                while read -r LINE;do
                     fullfile=$(echo "$LINE" | awk '{ print $2 }')
                     #filename=$(basename "$fullfile")
                     filedir=$(dirname "$fullfile")
@@ -221,24 +295,25 @@ createwineprefix(){
     winever=$(wine --version)
     if [ $? -ne 0 ];then
         echo "[ERR] Wine not found"
-        read -p "Any key to continue"
+        read -r -p "Any key to continue"
         return
     fi
 
-    echo "Create new wineprefix ${winever}"
+    echo "Create new wineprefix..."
+    echo "${winever}, WINEARCH=${WINEARCH}"
+    echo ""
     echo "Enter patch to wineprefix or empty to default"
-    read -p "(default patch: ${potbs_wineprefix}) :" ptch
+    read -e -r -p "(default patch: ${potbs_wineprefix}) :"  ptch
     if [ "${ptch}" != "" ];then
         potbs_wineprefix=${ptch}
     fi
-
     echo "Init wine to ${potbs_wineprefix}"
 
     #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
     WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" wineboot --init
     if [ $? -ne 0 ];then
         echo "[ERR] Create wineprefix"
-        read -p "Any key to continue"
+        read -r -p "Any key to continue"
         return
     fi
 
@@ -246,28 +321,32 @@ createwineprefix(){
     if [ $? -ne 0 ];then
         echo "[Warn] No winetrics found"
         echo "Manual install d3dx9 d3dcompiler_43 vcrun2019 PhysX"
-        read -p "Any key to continue"
+        read -r -p "Any key to continue"
         return
     fi
 
-    WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43 vcrun2019
+    if [ "$debug" ];then
+        echo "[DBG] winetriksver=${winetriksver}"
+    fi
+
+    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43 vcrun2019
     if [ $? -ne 0 ];then
         echo "[ERR] no install d3dx9 d3dcompiler_43 vcrun2019"
-        read -p "Any key to continue"
+        read -r -p "Any key to continue"
         return
     fi
 
-    WINEPREFIX="${potbs_wineprefix}" winetricks -q ${work_dir}/PhysxLegacy.verb
+    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q "${work_dir}"/PhysxLegacy.verb
     if [ $? -ne 0 ];then
         echo "[ERR] no install PhysX"
-        read -p "Any key to continue"
+        read -r -p "Any key to continue"
         return
     fi
 
     echo "Wineprefix create success!"
     echo ""
     while true; do
-        read -p "Download Full Game?" yn
+        read -r -p "Download Full Game? (y\n):" yn
         case $yn in
             [Yy]* )
                 fullinstall
@@ -289,44 +368,47 @@ rungame(){
 
     if [ "${currenthash}" != "${buildhash}" ];then
         echo "Current version NOT updated"
-        read -p "Any key to exit"
+        read -r -p "Any key to exit"
         return
     fi
 
-    cd "${potbs_dir}"
-    WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
+    cd "${potbs_dir}" || exit 1
+    WINEARCH=${WINEARCH} WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
 
 
 }
 #####################################################################################
 
 #Если параметр 1 не существует, ошибка
-if [ -z $1 ]
+if [ -z "$1" ]
 then
     #echo "Error. Неверные параметры."
     help
     exit 0
 fi
 
-if [ $debug ];then
-    echo "[DBG] version 20210115"
+if [ "$debug" ];then
+    echo "[DBG] version 20210117"
 fi
 
 case "$1" in
     v) getlocalversion;;
     u)
         # if not args, only check
-        if [ -z $2 ];then
+        if [ -z "$2" ];then
             checkupdate
         else
             while [ -n "$2" ];do
                 case "$2" in
                     -i )
-                        patchinstall "$3"
+                        #checkupdate
+                        patchinstall
+                        checklocalfiles
                         shift
                     ;;
                     -f )
                         fullinstall "$3"
+                        checklocalfiles
                         shift
                     ;;
                     *) echo "not args $2";;
