@@ -292,6 +292,9 @@ checklocalfiles(){
 
 
 createwineprefix(){
+
+    type wine >/dev/null 2>&1 || { echo >&2 "[Warn] No wine found.  Aborting."; return; }
+
     winever=$(wine --version)
     if [ $? -ne 0 ];then
         echo "[ERR] Wine not found"
@@ -317,17 +320,7 @@ createwineprefix(){
         return
     fi
 
-    winetriksver=$(winetricks -V | cut -d' ' -f1)
-    if [ $? -ne 0 ];then
-        echo "[Warn] No winetrics found"
-        echo "Manual install d3dx9 d3dcompiler_43 vcrun2019 PhysX"
-        read -r -p "Any key to continue"
-        return
-    fi
-
-    if [ "$debug" ];then
-        echo "[DBG] winetriksver=${winetriksver}"
-    fi
+    type winetricks >/dev/null 2>&1 || { echo >&2 "[Warn] No winetricks found.  Aborting."; return; }
 
     WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43 vcrun2019
     if [ $? -ne 0 ];then
