@@ -22,6 +22,7 @@ buildsversion="${work_dir}/builds"
 corruptedfiles="${work_dir}/corrupted"
 jq="${work_dir}/jq-linux64"
 hash="${work_dir}/potbs_hash"
+patch4gb="${work_dir}/4gb_patch.exe"
 
 #debug=1
 
@@ -38,6 +39,8 @@ command:
         -f install update (full)
     c  check local files for compliance
     n  create new wineprefix
+    p  apply 4gb patch
+    l  download updated locale files (RU only)
 
 examples:
 
@@ -382,6 +385,13 @@ downloadLocale(){
 
 }
 
+apply4gb(){
+    echo "apply 4gb patch to PotBS.exe"
+
+    WINEARCH=${WINEARCH} WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine "${patch4gb}" "${potbs_dir}/PotBS.exe"
+
+
+}
 #####################################################################################
 
 #Если параметр 1 не существует, ошибка
@@ -393,7 +403,7 @@ then
 fi
 
 if [ "$debug" ];then
-    echo "[DBG] version 20210117"
+    echo "[DBG] version 20210122"
 fi
 
 case "$1" in
@@ -426,6 +436,7 @@ case "$1" in
     n) createwineprefix;;
     r) rungame;;
     l) downloadLocale;;
+    p) apply4gb;;
     *) help;;
 esac
 
