@@ -143,13 +143,13 @@ patchinstall(){
         fi
         filedir=$(dirname "$fullfile")
         rm "${potbs_dir}/${fullfile}"
-        wget -c -nH --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
     done < <(printf '%s\n' "$pathUpdate")
 
     echo "Download added files"
     while read -r fullfile;do
         filedir=$(dirname "$fullfile")
-        wget -c -nH --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
     done < <(printf '%s\n' "${pathAdd}")
 
 
@@ -282,7 +282,7 @@ checklocalfiles(){
                     #filename=$(basename "$fullfile")
                     filedir=$(dirname "$fullfile")
                     rm "${potbs_dir}/${fullfile}"
-                    wget -c -nH --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+                    wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
                 done < "${corruptedfiles}"
 
                 break;;
@@ -378,10 +378,10 @@ downloadLocale(){
     echo "Download Updated RU locale"
 
     rm "${potbs_dir}/locale/ru_ru_data.dat"
-    wget -c -nH --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/blob/master/ru_ru_data.dat"
+    wget -c -nH -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dat"
 
     rm "${potbs_dir}/locale/ru_ru_data.dir"
-    wget -c -nH --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/blob/master/ru_ru_data.dir"
+    wget -c -nH -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dir"
 
 }
 
