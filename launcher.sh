@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# PotBS Linux Launcher
+# Script to simplify wine environment creation, download, run game and check\install updates.
+#
+# Author: SnakeSel
+# git: https://github.com/SnakeSel/PotBS_Linux_Launcher
+
+version=20210417
+
 #### EDIT THIS SETTINGS ####
 
 #potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
@@ -9,23 +17,30 @@ potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 # win64 | win32
 WINEARCH=win32
 
-#### NOT EDIT ##############
+debugging=0
 
+#### NOT EDIT ##############
+script_name=${0##*/}
 # полный путь до скрипта
 abs_filename=$(readlink -e "$0")
 # каталог в котором лежит скрипт
 work_dir=$(dirname "$abs_filename")
-script_name=${0##*/}
+bin_dir="${work_dir}/bin"
+data_dir="${work_dir}/data"
 
 potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
-buildsversion="${work_dir}/builds"
-corruptedfiles="${work_dir}/corrupted"
-jq="${work_dir}/jq-linux64"
-hash="${work_dir}/potbs_hash"
-patch4gb="${work_dir}/4gb_patch.exe"
 
-#debug=1
+buildsversion="${data_dir}/builds"
+corruptedfiles="${data_dir}/corrupted"
 
+jq="${bin_dir}/jq-linux64"
+hash="${bin_dir}/potbs_hash"
+patch4gb="${bin_dir}/4gb_patch.exe"
+
+
+POTBS_VERSION_INSTALLED=""
+POTBS_VERSION_SERVER=""
+POTBS_UPDATE_REQUIRED=0
 ######################################################
 
 help(){
@@ -34,42 +49,58 @@ $script_name [command] <args>
 command:
     r  run game
     v  display the currently installed version of the game
-    u  check for updates
-        -i install update (patch)
-        -f install update (full)
-    c  check local files for compliance
     n  create new wineprefix
+    d  download Game
+    u  check and install updates
+    c  check local files for compliance
     p  apply 4gb patch
     l  download updated locale files (RU only)
 
 examples:
-
-Check update and exit:
-    $script_name u
+Run game:
+    $script_name
+    or
+    $script_name r
 
 Check update and install:
-    $script_name u -i
-
-Full install latest version:
-    $script_name u -f
-
+    $script_name u
 EOF
 }
 
-
-# Full dowload potbs $1 version
-fullinstall(){
-    if [ -z "$1" ];then
-        build=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
-    else
-        build=$1
+debug() {
+    if [ "${debugging:-0}" -eq 1 ]; then
+        #echo "$(date +'%Y-%m-%d %H:%M:%S')" "$@" >> "${logfile}/${script_name}.log"
+        echo "[DBG:${BASH_LINENO[0]}] $*"
     fi
-    echo "Install PotBS version: ${build}"
+}
+
+# verify launcher dir and bin
+verifying(){
+    local error=0
+    type "${jq}" >/dev/null 2>&1 || { echo >&2 "[ERR] No jq found."; error=1; }
+    type "${hash}" >/dev/null 2>&1 || { echo >&2 "[ERR] No hash found."; error=1; }
+
+    if ! [ -d "${data_dir}" ]; then
+        #echo "No ${data_dir}"
+        mkdir -p "${data_dir}"
+    fi
+
+    if [ $error -eq 1 ]; then
+        exit 1
+    fi
+
+}
+
+# Full dowload potbs
+fullinstall(){
+    getServerVersion
+
+    echo "Install PotBS ${POTBS_VERSION_SERVER}"
     echo "to: ${potbs_dir}"
     #wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -o wget.txt  -P "${potbs_dir}/test" --reject="index.html*" "${potbs_url}/Builds/${build}/"
-    wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -P "${potbs_dir}" --reject="index.html*" "${potbs_url}/Builds/${build}/"
+    wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -P "${potbs_dir}" --reject="index.html*" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/"
     if [ $? -eq 0 ];then
-        echo "Game version ${build} installed"
+        echo "Game version ${POTBS_VERSION_SERVER} installed"
     else
         echo "Error download"
     fi
@@ -86,45 +117,34 @@ fullinstall(){
 # 3 = changed attributes
 # 4 = added
 patchinstall(){
-    build=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
-    localbuild=$(getlocalversion)
+    getServerVersion
+    getlocalversion
 
-    if [ "$debug" ];then
-        localbuild="2.17.7"
-        echo "[DBG] localbuild=${localbuild}"
+    if [ "$debugging" ];then
+        POTBS_VERSION_INSTALLED="2.17.7"
     fi
 
-    if [ "$localbuild" == "$build" ];then
+    if [ "${POTBS_VERSION_INSTALLED}" == "${POTBS_VERSION_SERVER}" ];then
         echo "Update not required."
         return
     fi
 
-    echo "Cheking patch ${localbuild} to ${build}"
-    patchlist=$(curl -s "${potbs_url}/Patches/${localbuild}_${build}.json")
+    echo "Cheking patch ${POTBS_VERSION_INSTALLED} to ${POTBS_VERSION_SERVER}"
+    patchlist=$(curl -s "${potbs_url}/Patches/${POTBS_VERSION_INSTALLED}_${POTBS_VERSION_SERVER}.json")
     echo "${patchlist}" | grep "Not Found" > /dev/null
     if [ $? -eq 0 ];then
-        echo "[ERR] Patch ${localbuild}_${build}.json not found"
+        echo "[ERR] Patch ${POTBS_VERSION_INSTALLED}_${POTBS_VERSION_SERVER}.json not found"
         exit 1
     fi
 
     pathDel=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==1) | .RelativePath')
-    if [ "$debug" ];then
-        echo "[DBG] pathDel:"
-        echo "${pathDel}"
-
-    fi
+    debug "pathDel: ${pathDel}"
 
     pathUpdate=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==2) | .RelativePath')
-    if [ "$debug" ];then
-        echo "[DBG] pathUpdate:"
-        echo "$pathUpdate"
-    fi
+    debug "pathUpdate: $pathUpdate"
 
     pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
-    if [ "$debug" ];then
-        echo "[DBG] pathAdd:"
-        echo "$pathAdd"
-    fi
+    debug "pathAdd: $pathAdd"
 
     echo "Apply the patch"
 
@@ -152,34 +172,48 @@ patchinstall(){
         wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
     done < <(printf '%s\n' "${pathAdd}")
 
-
     echo "patch apply finished"
-
 }
 
+# Check update on server
+# and write to POTBS_UPDATE_REQUIRED
 checkupdate(){
+    getServerVersion
+
+    if [ "${POTBS_VERSION_INSTALLED}" == "${POTBS_VERSION_SERVER}" ];then
+        echo "Update not required."
+        return
+    fi
+
     echo "Check update version"
-    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
-    echo "Last Build: ${lastbuild}"
+    echo "Server Version: ${POTBS_VERSION_SERVER}"
 
     currenthash=$(cat "${potbs_dir}/version.data")
-    buildhash=$(curl -s "${potbs_url}/Builds/${lastbuild}/version.data")
+    buildhash=$(curl -s "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/version.data")
 
     if [ "${currenthash}" = "${buildhash}" ];then
         echo "Current version last updated"
-        #read -p "Any key to exit"
-        exit 0
-        #return
+        POTBS_UPDATE_REQUIRED=0
+        return
     fi
 
-    carrent=$(getlocalversion)
-    echo "Local version: ${carrent}"
-    #echo "${lastbuild} > ${carrent}" | bc
+    getlocalversion
+    echo "Installed version: ${POTBS_VERSION_INSTALLED}"
     echo "Update required"
+    POTBS_UPDATE_REQUIRED=1
 
 }
 
+# determine server game version
+# and write it to POTBS_VERSION_SERVER
+getServerVersion(){
+    POTBS_VERSION_SERVER=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
+}
+
+# determine installed game version
+# and write it to POTBS_VERSION_INSTALLED
 getlocalversion(){
+    # get version hash installed game
     localhash=$(cat "${potbs_dir}/version.data")
     if [ $? -ne 0 ];then
         echo "[ERR] Not found: ${potbs_dir}/version.data"
@@ -187,20 +221,20 @@ getlocalversion(){
         return
     fi
 
-    #if [ $debug ];then
-    #    echo "[DBG] localhash = ${localhash}"
-    #fi
+    debug "localhash = ${localhash}"
 
-    # if version number is in the file $localhash, return it
+    # if version number is in the file $buildsversion, return it
     if [ -f "${buildsversion}" ];then
         # Убираем пробелы в начале и комментарии:
         raw_param=$(grep "${localhash}" "${buildsversion}" | sed 's/^[ \t]*//' | grep -v "^#" )
-        #echo "$raw_param"
         # Берем значение и убираем пробелы в начале и конце
         param=$(echo "${raw_param}" | cut -d"=" -f1 | sed 's/^[ \t]*//' | sed 's/[ \t]*$//')
 
+        # if installed version found, exit function
         if [ "${param}" != "" ];then
-            echo "${param}"
+            POTBS_VERSION_INSTALLED=${param}
+            debug "POTBS_VERSION_INSTALLED=${param}"
+            #echo "${result}"
             return
         fi
     else
@@ -219,51 +253,46 @@ getlocalversion(){
     read -r -a allbuilds <<< "$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r -c '.["AvailableBuilds"]' | sed 's/\[//' | sed 's/]//' | sed 's/"//g')"
     IFS=$oldIFS
 
-    if [ $debug ];then
-        echo "[DBG] read allbuilds finish"
-    fi
+    debug "read allbuilds finish"
 
-    #
     for build in "${allbuilds[@]}"; do
         buildhash=$(curl -s "${potbs_url}/Builds/${build}/version.data")
 
         echo "${buildhash}" | grep "Not Found" > /dev/null
         if [ $? -eq 0 ];then
-            if [ $debug ];then
-                echo "[DBG] Version ${build} not found"
-            fi
+            debug "Version ${build} not found"
             continue
         fi
 
         if [ "${localhash}" = "${buildhash}" ];then
             result="${build}"
         fi
-        if [ $debug ];then
-            echo "[DBG] $build=${buildhash}"
-        fi
+        debug "$build=${buildhash}"
         echo "$build=${buildhash}" >> "${buildsversion}"
     done
 
     if [ "${result}" != "" ];then
-        echo "${result}"
+        POTBS_VERSION_INSTALLED=${param}
+        debug "POTBS_VERSION_INSTALLED=${param}"
+        #echo "${result}"
         return
     else
-        echo "Not found"
+        echo "[ERR] Installed Game verison unspecified"
     fi
 }
 
 
 checklocalfiles(){
-    build=$(getlocalversion)
+    getlocalversion
+    hashFile="${data_dir}/hashsum_${POTBS_VERSION_INSTALLED}"
 
     echo "Checking files started..."
 
-    curl -s "${potbs_url}/Builds/build_${build}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${work_dir}/hashsum_${build}"
+    curl -s "${potbs_url}/Builds/build_${POTBS_VERSION_INSTALLED}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${hashFile}"
 
     cd "${potbs_dir}" || exit
 
-    "${hash}" -c "${work_dir}/hashsum_${build}" | grep "FAIL" | tee "${corruptedfiles}"
-#    if [ $? -eq 0 ]; then
+    "${hash}" -c "${hashFile}" | grep "FAIL" | tee "${corruptedfiles}"
     if [ ! -s "${corruptedfiles}" ];then
         echo "No corrupted file"
         rm "${corruptedfiles}"
@@ -273,6 +302,7 @@ checklocalfiles(){
 
     cd "${work_dir}" || exit
 
+    echo ""
     while true; do
         read -r -p "Download corrupted file? (y\n):" yn
         case $yn in
@@ -316,7 +346,7 @@ createwineprefix(){
     echo "Init wine to ${potbs_wineprefix}"
 
     #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
-    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot --init
     if [ $? -ne 0 ];then
         echo "[ERR] Create wineprefix"
         read -r -p "Any key to continue"
@@ -358,19 +388,16 @@ createwineprefix(){
 }
 
 rungame(){
-    lastbuild=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
-    currenthash=$(cat "${potbs_dir}/version.data")
-    buildhash=$(curl -s "${potbs_url}/Builds/${lastbuild}/version.data")
-
-    if [ "${currenthash}" != "${buildhash}" ];then
-        echo "Current version NOT updated"
+    checkupdate
+    if [ "${POTBS_UPDATE_REQUIRED}" -eq 1 ]; then
+        echo "[ERR] Current version NOT updated"
         read -r -p "Any key to exit"
-        return
+        #return
+        exit 1
     fi
 
     cd "${potbs_dir}" || exit 1
-    WINEARCH=${WINEARCH} WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
-
+    WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
 
 }
 
@@ -388,52 +415,56 @@ downloadLocale(){
 apply4gb(){
     echo "apply 4gb patch to PotBS.exe"
 
-    WINEARCH=${WINEARCH} WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine "${patch4gb}" "${potbs_dir}/PotBS.exe"
+    WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine "${patch4gb}" "${potbs_dir}/PotBS.exe"
 
 
 }
 #####################################################################################
+# verify launcher dir and bin
+verifying
 
 #Если параметр 1 не существует, ошибка
 if [ -z "$1" ]
 then
     #echo "Error. Неверные параметры."
-    help
+    #help
+    rungame
     exit 0
 fi
 
-if [ "$debug" ];then
-    echo "[DBG] version 20210122"
-fi
-
 case "$1" in
-    v) getlocalversion;;
+    v)
+        getlocalversion
+        if [ "${POTBS_VERSION_INSTALLED}" == "" ];then
+            echo "[ERR] Installed Game verison unspecified"
+            exit 1
+        fi
+        echo "PotBS Installed: ${POTBS_VERSION_INSTALLED}"
+        echo "Launcher: ${version}"
+    ;;
+    n) createwineprefix;;
+    d)
+        fullinstall
+        checklocalfiles
+    ;;
     u)
-        # if not args, only check
-        if [ -z "$2" ];then
-            checkupdate
-        else
-            while [ -n "$2" ];do
-                case "$2" in
-                    -i )
-                        #checkupdate
-                        patchinstall
-                        checklocalfiles
-                        shift
-                    ;;
-                    -f )
-                        fullinstall "$3"
-                        checklocalfiles
-                        shift
-                    ;;
-                    *) echo "not args $2";;
-                esac
-                shift
+        checkupdate
+        if [ "${POTBS_UPDATE_REQUIRED}" -eq 1 ]; then
+            echo ""
+            while true; do
+            read -r -p "Install update? (y\n):" yn
+            case $yn in
+                [Yy]* )
+                    patchinstall
+                    checklocalfiles
+                    break;;
+                [Nn]* ) break;;
+                * ) echo "Please answer yes or no.";;
+            esac
             done
         fi
     ;;
     c) checklocalfiles;;
-    n) createwineprefix;;
     r) rungame;;
     l) downloadLocale;;
     p) apply4gb;;
@@ -441,5 +472,3 @@ case "$1" in
 esac
 
 exit 0
-
-
