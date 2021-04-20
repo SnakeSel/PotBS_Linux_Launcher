@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210417
+version=20210420
 
 #### EDIT THIS SETTINGS ####
 
@@ -153,7 +153,7 @@ patchinstall(){
         if [ "$LINE" == "" ];then
             continue
         fi
-        rm "${potbs_dir}/${LINE}"
+        rm -f "${potbs_dir}/${LINE}"
     done < <(printf '%s\n' "${pathDel}")
 
     echo "Remove old and download updated files"
@@ -162,14 +162,14 @@ patchinstall(){
             continue
         fi
         filedir=$(dirname "$fullfile")
-        rm "${potbs_dir}/${fullfile}"
-        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+        rm -f "${potbs_dir}/${fullfile}"
+        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
     done < <(printf '%s\n' "$pathUpdate")
 
     echo "Download added files"
     while read -r fullfile;do
         filedir=$(dirname "$fullfile")
-        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
     done < <(printf '%s\n' "${pathAdd}")
 
     echo "patch apply finished"
@@ -311,8 +311,8 @@ checklocalfiles(){
                     fullfile=$(echo "$LINE" | awk '{ print $2 }')
                     #filename=$(basename "$fullfile")
                     filedir=$(dirname "$fullfile")
-                    rm "${potbs_dir}/${fullfile}"
-                    wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${build}/${fullfile}"
+                    rm -f "${potbs_dir}/${fullfile}"
+                    wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
                 done < "${corruptedfiles}"
 
                 break;;
@@ -357,7 +357,14 @@ createwineprefix(){
 
     WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43 vcrun2019
     if [ $? -ne 0 ];then
-        echo "[ERR] no install d3dx9 d3dcompiler_43 vcrun2019"
+        echo "[ERR] no install d3dx9 d3dcompiler_43"
+        read -r -p "Any key to continue"
+        return
+    fi
+
+    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q vcrun2019
+    if [ $? -ne 0 ];then
+        echo "[ERR] no install vcrun2019"
         read -r -p "Any key to continue"
         return
     fi
