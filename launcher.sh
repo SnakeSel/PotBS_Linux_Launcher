@@ -10,8 +10,8 @@ version=20210420
 
 #### EDIT THIS SETTINGS ####
 
-#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-potbs_wineprefix="$HOME/PotBS"
+potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+#potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 # win64 | win32
@@ -163,13 +163,13 @@ patchinstall(){
         fi
         filedir=$(dirname "$fullfile")
         rm -f "${potbs_dir}/${fullfile}"
-        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
+        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/${fullfile}"
     done < <(printf '%s\n' "$pathUpdate")
 
     echo "Download added files"
     while read -r fullfile;do
         filedir=$(dirname "$fullfile")
-        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
+        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/${fullfile}"
     done < <(printf '%s\n' "${pathAdd}")
 
     echo "patch apply finished"
