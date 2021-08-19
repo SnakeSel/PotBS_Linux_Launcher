@@ -6,18 +6,18 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210420
+version=20210819
 
 #### EDIT THIS SETTINGS ####
 
-potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-#potbs_wineprefix="$HOME/PotBS"
+#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 # win64 | win32
 WINEARCH=win32
 
-debugging=0
+#debugging=1
 
 #### NOT EDIT ##############
 script_name=${0##*/}
@@ -55,6 +55,7 @@ command:
     c  check local files for compliance
     p  apply 4gb patch
     l  download updated locale files (RU only)
+    dx install dxvk
 
 examples:
 Run game:
@@ -90,6 +91,16 @@ verifying(){
     fi
 
 }
+
+# $1 - "{owner}/{repo}"
+get_latest_release() {
+    #curl --silent "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
+    #grep '"tag_name":' |                                            # Get tag line
+    #sed -E 's/.*"([^"]+)".*/\1/'                                    # Pluck JSON value
+    curl --silent "https://api.github.com/repos/$1/releases/latest" | "${jq}" -r '.tag_name'
+
+}
+
 
 # Full dowload potbs
 fullinstall(){
@@ -198,6 +209,11 @@ checkupdate(){
     fi
 
     getlocalversion
+    if [ $? -ne 0 ];then
+        debug "[ERR] checkupdate:getlocalversion"
+        exit 1
+    fi
+
     echo "Installed version: ${POTBS_VERSION_INSTALLED}"
     echo "Update required"
     POTBS_UPDATE_REQUIRED=1
@@ -208,6 +224,13 @@ checkupdate(){
 # and write it to POTBS_VERSION_SERVER
 getServerVersion(){
     POTBS_VERSION_SERVER=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
+    if [ -n "$POTBS_VERSION_SERVER" ];then
+        return 0
+    else
+        echo "[ERR] failed to get server version"
+        #return 1
+        exit 1
+    fi
 }
 
 # determine installed game version
@@ -218,7 +241,8 @@ getlocalversion(){
     if [ $? -ne 0 ];then
         echo "[ERR] Not found: ${potbs_dir}/version.data"
         echo "Maybe Game not installed?"
-        return
+        #return 1
+        exit 1
     fi
 
     debug "localhash = ${localhash}"
@@ -235,7 +259,7 @@ getlocalversion(){
             POTBS_VERSION_INSTALLED=${param}
             debug "POTBS_VERSION_INSTALLED=${param}"
             #echo "${result}"
-            return
+            return 0
         fi
     else
         echo "Builds file not exist"
@@ -275,10 +299,13 @@ getlocalversion(){
         POTBS_VERSION_INSTALLED=${param}
         debug "POTBS_VERSION_INSTALLED=${param}"
         #echo "${result}"
-        return
+        return 0
     else
         echo "[ERR] Installed Game verison unspecified"
     fi
+
+    #return 1
+    exit 1
 }
 
 
@@ -295,7 +322,7 @@ checklocalfiles(){
     "${hash}" -c "${hashFile}" | grep "FAIL" | tee "${corruptedfiles}"
     if [ ! -s "${corruptedfiles}" ];then
         echo "No corrupted file"
-        rm "${corruptedfiles}"
+        rm -f "${corruptedfiles}"
         cd "${work_dir}" || exit
         return
     fi
@@ -314,7 +341,7 @@ checklocalfiles(){
                     rm -f "${potbs_dir}/${fullfile}"
                     wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
                 done < "${corruptedfiles}"
-
+                rm -f "${corruptedfiles}"
                 break;;
             [Nn]* ) break;;
             * ) echo "Please answer yes or no.";;
@@ -346,7 +373,8 @@ createwineprefix(){
     echo "Init wine to ${potbs_wineprefix}"
 
     #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
-    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    #WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot -u
     if [ $? -ne 0 ];then
         echo "[ERR] Create wineprefix"
         read -r -p "Any key to continue"
@@ -355,21 +383,33 @@ createwineprefix(){
 
     type winetricks >/dev/null 2>&1 || { echo >&2 "[Warn] No winetricks found.  Aborting."; return; }
 
-    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43 vcrun2019
-    if [ $? -ne 0 ];then
-        echo "[ERR] no install d3dx9 d3dcompiler_43"
-        read -r -p "Any key to continue"
-        return
-    fi
+    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43
+    #if [ $? -ne 0 ];then
+    #    echo "[ERR] no install d3dx9 d3dcompiler_43"
+    #    read -r -p "Any key to continue"
+    #    return
+    #fi
 
-    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q vcrun2019
+    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" winetricks -q vcrun2019
     if [ $? -ne 0 ];then
         echo "[ERR] no install vcrun2019"
-        read -r -p "Any key to continue"
-        return
+        echo ""
+        while true; do
+        read -r -p "Continue install? (y\n):" yn
+        case $yn in
+            [Yy]* )
+                break;;
+            [Nn]* )
+                return
+                break;;
+            * ) echo "Please answer yes or no.";;
+        esac
+        done
+
     fi
 
-    WINEARCH=${WINEARCH} WINEPREFIX="${potbs_wineprefix}" winetricks -q "${work_dir}"/PhysxLegacy.verb
+    debug "WINEARCH=\"${WINEARCH}\" WINEPREFIX=\"${potbs_wineprefix}\" winetricks -q \"${work_dir}\"/PhysxLegacy.verb"
+    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" winetricks -q "${work_dir}/PhysxLegacy.verb"
     if [ $? -ne 0 ];then
         echo "[ERR] no install PhysX"
         read -r -p "Any key to continue"
@@ -422,8 +462,57 @@ downloadLocale(){
 apply4gb(){
     echo "apply 4gb patch to PotBS.exe"
 
+    if [ ! -f "${patch4gb}" ];then
+        echo "[ERR] patch not found in: ${patch4gb}"
+        read -r -p "Any key to exit"
+        #return
+        exit 1
+    fi
+
     WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine "${patch4gb}" "${potbs_dir}/PotBS.exe"
 
+
+}
+
+install_dxvk(){
+    repo="doitsujin/dxvk"
+
+    echo "Get release DXVK ..."
+    latestTag=$(get_latest_release "$repo")
+    echo "Latest version: ${latestTag}"
+
+    taginfo=$(curl --silent "https://api.github.com/repos/${repo}/releases/tags/${latestTag}")
+    debug "$taginfo"
+    file_uri=$(echo "$taginfo" | "${jq}" -r '.assets[0].browser_download_url')
+    file_name=$(echo "$taginfo" | "${jq}" -r '.assets[0].name')
+
+    echo "Download ${latestTag} to ${data_dir}/${file_name}"
+    debug "from ${file_uri}"
+    echo ""
+    curl -fSL "${file_uri}" -o "${data_dir}/${file_name}"
+
+    echo "Extract tar.gz ..."
+
+    if [ ! -s "${data_dir}/${file_name}" ];then
+        echo "[ERR] dxvk not found. (${1})"
+        read -r -p "Any key to exit"
+        #return
+        exit 1
+    fi
+    #tar -xvf ${data_dir}/${file_name} dxvk-1.9.1/x64/d3d9.dll
+
+    tar -C "${data_dir}" -xvf "${data_dir}/${file_name}"
+    if [ $? -ne 0 ];then
+        echo "[ERR] extract ${data_dir}/${file_name}"
+        read -r -p "Any key to continue"
+        exit 1
+    fi
+
+    cd "${data_dir}"/dxvk-*/
+    WINEPREFIX="${potbs_wineprefix}" ./setup_dxvk.sh install --without-dxgi
+
+    echo "Clean tar.gz"
+    rm -f ${data_dir}/${file_name}
 
 }
 #####################################################################################
@@ -475,6 +564,7 @@ case "$1" in
     r) rungame;;
     l) downloadLocale;;
     p) apply4gb;;
+    dx) install_dxvk;;
     *) help;;
 esac
 
