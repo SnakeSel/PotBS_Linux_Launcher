@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210819
+version=20210819-2
 
 #### EDIT THIS SETTINGS ####
 
@@ -494,7 +494,7 @@ install_dxvk(){
     echo "Extract tar.gz ..."
 
     if [ ! -s "${data_dir}/${file_name}" ];then
-        echo "[ERR] dxvk not found. (${1})"
+        echo "[ERR] dxvk not found. (${data_dir}/${file_name})"
         read -r -p "Any key to exit"
         #return
         exit 1
@@ -508,11 +508,11 @@ install_dxvk(){
         exit 1
     fi
 
-    cd "${data_dir}"/dxvk-*/
+    cd "${data_dir}"/dxvk-*/ || echo "[err] cd to ${data_dir}/dxvk-*/";exit 1
     WINEPREFIX="${potbs_wineprefix}" ./setup_dxvk.sh install --without-dxgi
 
     echo "Clean tar.gz"
-    rm -f ${data_dir}/${file_name}
+    rm -f "${data_dir}"/"${file_name}"
 
 }
 #####################################################################################
