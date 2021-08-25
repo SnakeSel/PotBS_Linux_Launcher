@@ -128,13 +128,20 @@ fullinstall(){
 # 3 = changed attributes
 # 4 = added
 patchinstall(){
-    getServerVersion
     getlocalversion
+
+    if [ -n "${1}" ];then
+        echo "Manual select update to ${1}"
+        POTBS_VERSION_SERVER="${1}"
+    else
+        getServerVersion
+    fi
 
     if [ "$debugging" ];then
         POTBS_VERSION_INSTALLED="2.17.7"
     fi
 
+    
     if [ "${POTBS_VERSION_INSTALLED}" == "${POTBS_VERSION_SERVER}" ];then
         echo "Update not required."
         return
@@ -444,7 +451,7 @@ rungame(){
     fi
 
     cd "${potbs_dir}" || exit 1
-    WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
+    DXVK_LOG_LEVEL="none" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
 
 }
 
@@ -551,7 +558,11 @@ case "$1" in
             read -r -p "Install update? (y\n):" yn
             case $yn in
                 [Yy]* )
-                    patchinstall
+                    if [ "${2}" ];then
+                        patchinstall "${2}"
+                    else
+                        patchinstall
+                    fi
                     checklocalfiles
                     break;;
                 [Nn]* ) break;;
