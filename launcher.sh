@@ -6,18 +6,21 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210819-3
+version=20210826
 
 #### EDIT THIS SETTINGS ####
 
-#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-potbs_wineprefix="$HOME/PotBS"
+potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+#potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 # win64 | win32
 WINEARCH=win32
 
+# show debug msg
 #debugging=1
+# use test, not apply change
+#testing=1
 
 #### NOT EDIT ##############
 script_name=${0##*/}
@@ -128,7 +131,6 @@ fullinstall(){
 # 3 = changed attributes
 # 4 = added
 patchinstall(){
-    getlocalversion
 
     if [ -n "${1}" ];then
         echo "Manual select update to ${1}"
@@ -137,60 +139,101 @@ patchinstall(){
         getServerVersion
     fi
 
-    if [ "$debugging" ];then
+    if [ "${testing:-0}" -eq 1 ];then
         POTBS_VERSION_INSTALLED="2.17.7"
+        echo "test: POTBS_VERSION_INSTALLED=$POTBS_VERSION_INSTALLED"
+    else
+        getlocalversion
     fi
 
-    
+
     if [ "${POTBS_VERSION_INSTALLED}" == "${POTBS_VERSION_SERVER}" ];then
         echo "Update not required."
         return
     fi
 
-    echo "Cheking patch ${POTBS_VERSION_INSTALLED} to ${POTBS_VERSION_SERVER}"
-    patchlist=$(curl -s "${potbs_url}/Patches/${POTBS_VERSION_INSTALLED}_${POTBS_VERSION_SERVER}.json")
-    echo "${patchlist}" | grep "Not Found" > /dev/null
+    echo "Cheking patches ${POTBS_VERSION_INSTALLED} to ${POTBS_VERSION_SERVER} ..."
+    patchesindex=$(curl -s "${potbs_url}/Patches/patches_index.json")
+    echo "${patchesindex}" | grep "Not Found" > /dev/null
     if [ $? -eq 0 ];then
-        echo "[ERR] Patch ${POTBS_VERSION_INSTALLED}_${POTBS_VERSION_SERVER}.json not found"
+        echo "[ERR] patches_index.json not found"
         exit 1
     fi
 
-    pathDel=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==1) | .RelativePath')
-    debug "pathDel: ${pathDel}"
-
-    pathUpdate=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==2) | .RelativePath')
-    debug "pathUpdate: $pathUpdate"
-
-    pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
-    debug "pathAdd: $pathAdd"
-
-    echo "Apply the patch"
-
-    echo "Remove deleted files..."
-    while read -r LINE;do
-        if [ "$LINE" == "" ];then
-            continue
+    # before we install all the patches 
+    while [ "${POTBS_VERSION_INSTALLED}" != "${POTBS_VERSION_SERVER}" ];do
+        if [ -n "${1}" ];then
+            echo "Manual select update to ${1}"
+            patchTo="${1}"
+        else
+            patchTo=$(echo "${patchesindex}" | "${jq}" -r --arg POTBS_VERSION_INSTALLED "${POTBS_VERSION_INSTALLED}" '.["Patches"] | .[] | select(.From==$POTBS_VERSION_INSTALLED) |.To' 2> /dev/null )
         fi
-        rm -f "${potbs_dir}/${LINE}"
-    done < <(printf '%s\n' "${pathDel}")
 
-    echo "Remove old and download updated files"
-    while read -r fullfile;do
-        if [ "$fullfile" == "" ];then
-            continue
+        debug "patchTo: ${patchTo}"
+        if [ -z "${patchTo}" ];then
+            echo "[ERR] Not found update patch from ${POTBS_VERSION_INSTALLED} in patches_index.json"
+            echo "If you are sure that the patch from version ${POTBS_VERSION_INSTALLED} exists, start the launcher specifying which patch you need to install:"
+            echo "$script_name u <pathTO>"
+            exit 1
+
         fi
-        filedir=$(dirname "$fullfile")
-        rm -f "${potbs_dir}/${fullfile}"
-        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/${fullfile}"
-    done < <(printf '%s\n' "$pathUpdate")
 
-    echo "Download added files"
-    while read -r fullfile;do
-        filedir=$(dirname "$fullfile")
-        wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/${fullfile}"
-    done < <(printf '%s\n' "${pathAdd}")
+        echo ""
+        echo "patch from ${POTBS_VERSION_INSTALLED} to ${patchTo}"
 
-    echo "patch apply finished"
+        patchName="${POTBS_VERSION_INSTALLED}_${patchTo}"
+        debug "patchName: ${patchName}"
+
+        patchlist=$(curl -s "${potbs_url}/Patches/${patchName}.json")
+        echo "${patchlist}" | grep "Not Found" > /dev/null
+        if [ $? -eq 0 ];then
+            echo "[ERR] Patch ${patchName}.json not found"
+            exit 1
+        fi
+
+        pathDel=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==1) | .RelativePath')
+        debug "pathDel: ${pathDel}"
+
+        pathUpdate=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==2) | .RelativePath')
+        debug "pathUpdate: $pathUpdate"
+
+        pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
+        debug "pathAdd: $pathAdd"
+
+        echo "Apply the patch"
+
+        # Если тестируем то пропускаем примененеие
+        if [ "${testing:-0}" -ne 1 ]; then
+            echo "Remove deleted files..."
+            while read -r LINE;do
+                if [ "$LINE" == "" ];then
+                    continue
+                fi
+                rm -f "${potbs_dir}/${LINE}"
+            done < <(printf '%s\n' "${pathDel}")
+
+            echo "Remove old and download updated files"
+            while read -r fullfile;do
+                if [ "$fullfile" == "" ];then
+                    continue
+                fi
+                filedir=$(dirname "$fullfile")
+                rm -f "${potbs_dir}/${fullfile}"
+                wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${patchTo}/${fullfile}"
+            done < <(printf '%s\n' "$pathUpdate")
+
+            echo "Download added files"
+            while read -r fullfile;do
+                filedir=$(dirname "$fullfile")
+                wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${patchTo}/${fullfile}"
+            done < <(printf '%s\n' "${pathAdd}")
+        fi
+
+        echo "patch apply finished"
+
+        POTBS_VERSION_INSTALLED=${patchTo}
+
+    done
 }
 
 # Check update on server
@@ -303,12 +346,12 @@ getlocalversion(){
     done
 
     if [ "${result}" != "" ];then
-        POTBS_VERSION_INSTALLED=${param}
-        debug "POTBS_VERSION_INSTALLED=${param}"
+        POTBS_VERSION_INSTALLED=${result}
+        debug "POTBS_VERSION_INSTALLED=${result}"
         #echo "${result}"
         return 0
     else
-        echo "[ERR] Installed Game verison unspecified"
+        echo "[ERR] Installed Game version unspecified"
     fi
 
     #return 1
@@ -551,7 +594,11 @@ case "$1" in
         checklocalfiles
     ;;
     u)
-        checkupdate
+        if [ "${testing:-0}" -eq 1 ];then
+            POTBS_UPDATE_REQUIRED=1
+        else
+            checkupdate
+        fi
         if [ "${POTBS_UPDATE_REQUIRED}" -eq 1 ]; then
             echo ""
             while true; do
