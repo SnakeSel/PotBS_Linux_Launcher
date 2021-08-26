@@ -6,12 +6,12 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210826
+version=20210826-2
 
 #### EDIT THIS SETTINGS ####
 
-potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-#potbs_wineprefix="$HOME/PotBS"
+#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
+potbs_wineprefix="$HOME/PotBS"
 potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
 
 # win64 | win32
@@ -171,11 +171,17 @@ patchinstall(){
 
         debug "patchTo: ${patchTo}"
         if [ -z "${patchTo}" ];then
-            echo "[ERR] Not found update patch from ${POTBS_VERSION_INSTALLED} in patches_index.json"
-            echo "If you are sure that the patch from version ${POTBS_VERSION_INSTALLED} exists, start the launcher specifying which patch you need to install:"
-            echo "$script_name u <pathTO>"
-            exit 1
-
+            # Если не нашли патча, а текущая версия предпоследняя, то можем сами подставить версию
+            # ситуация когда Vision сломали patches_index.json
+            prerel=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-2]')
+            if [ "${prerel}" == "${POTBS_VERSION_INSTALLED}" ];then
+                patchTo="${POTBS_VERSION_SERVER}"
+            else
+                echo "[ERR] Not found update patch from ${POTBS_VERSION_INSTALLED} in patches_index.json"
+                echo "If you are sure that the patch from version ${POTBS_VERSION_INSTALLED} exists, start the launcher specifying which patch you need to install:"
+                echo "$script_name u <pathTO>"
+                exit 1
+            fi
         fi
 
         echo ""
@@ -200,7 +206,7 @@ patchinstall(){
         pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
         debug "pathAdd: $pathAdd"
 
-        echo "Apply the patch"
+        echo "Apply the patch ..."
 
         # Если тестируем то пропускаем примененеие
         if [ "${testing:-0}" -ne 1 ]; then
@@ -234,6 +240,10 @@ patchinstall(){
         POTBS_VERSION_INSTALLED=${patchTo}
 
     done
+    echo""
+    echo "All patches installed!"
+    echo""
+
 }
 
 # Check update on server
@@ -596,6 +606,7 @@ case "$1" in
     u)
         if [ "${testing:-0}" -eq 1 ];then
             POTBS_UPDATE_REQUIRED=1
+            echo "test mode"
         else
             checkupdate
         fi
