@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210826-2
+version=20210830
 
 #### EDIT THIS SETTINGS ####
 
@@ -59,6 +59,7 @@ command:
     p  apply 4gb patch
     l  download updated locale files (RU only)
     dx install dxvk
+    desc create desktop entry
 
 examples:
 Run game:
@@ -104,6 +105,31 @@ get_latest_release() {
 
 }
 
+# $1 title
+# $2 text
+# return: 0 yes; 1 no
+dialog_yesno(){
+    if (type zenity >/dev/null 2>&1);then
+        zenity --question --title="$1" --text "$2" --no-wrap --ok-label "Yes" --cancel-label "No"
+        return $?
+    fi
+
+    if (type whiptail >/dev/null 2>&1);then
+        whiptail --title "$1" --yesno "${2}" 10 90
+        return $?
+    fi
+
+    while true; do
+        echo "$1"
+        read -r -p "$(echo -e "$2") (y\n):" yn
+            case $yn in
+                [Yy]* ) return 0;;
+                [Nn]* ) return 1;;
+                * ) echo "Please answer yes or no.";;
+        esac
+    done
+
+}
 
 # Full dowload potbs
 fullinstall(){
@@ -498,12 +524,19 @@ rungame(){
     checkupdate
     if [ "${POTBS_UPDATE_REQUIRED}" -eq 1 ]; then
         echo "[ERR] Current version NOT updated"
-        read -r -p "Any key to exit"
-        #return
-        exit 1
+
+        #if (whiptail --title "Current version NOT updated" --yesno "version ${POTBS_VERSION_SERVER} available.\n\nInstall update?" 8 78); then
+        #if (zenity --question --title="Current version NOT updated" --text "version ${POTBS_VERSION_SERVER} available.\n\nInstall update?" --no-wrap --ok-label "Yes" --cancel-label "No"); then
+        if (dialog_yesno "Current version NOT updated" "version ${POTBS_VERSION_SERVER} available.\n\nInstall update?");then
+            patchinstall
+            checklocalfiles
+        else
+            exit 1
+        fi
+
     fi
 
-    cd "${potbs_dir}" || exit 1
+    cd "${potbs_dir}" || { echo "[err] cd to ${potbs_dir}";exit 1; }
     DXVK_LOG_LEVEL="none" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
 
 }
@@ -575,6 +608,25 @@ install_dxvk(){
     rm -f "${data_dir}"/"${file_name}"
 
 }
+
+create_desktop(){
+
+cat << EOF > PotBS.desktop
+[Desktop Entry]
+Encoding=UTF-8
+Type=Application
+Name=PotBS
+Comment=PotBS Linux Launcher
+Categories=Games;
+Exec=${work_dir}/launcher.sh
+Icon=${work_dir}/PotBS.png
+Terminal=true
+EOF
+
+chmod +x PotBS.desktop
+
+}
+
 #####################################################################################
 # verify launcher dir and bin
 verifying
@@ -582,8 +634,6 @@ verifying
 #Если параметр 1 не существует, ошибка
 if [ -z "$1" ]
 then
-    #echo "Error. Неверные параметры."
-    #help
     rungame
     exit 0
 fi
@@ -634,6 +684,7 @@ case "$1" in
     l) downloadLocale;;
     p) apply4gb;;
     dx) install_dxvk;;
+    desc) create_desktop;;
     *) help;;
 esac
 
