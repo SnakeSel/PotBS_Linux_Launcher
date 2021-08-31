@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210830
+version=20210831
 
 #### EDIT THIS SETTINGS ####
 
@@ -522,11 +522,10 @@ createwineprefix(){
 
 rungame(){
     checkupdate
+
     if [ "${POTBS_UPDATE_REQUIRED}" -eq 1 ]; then
         echo "[ERR] Current version NOT updated"
 
-        #if (whiptail --title "Current version NOT updated" --yesno "version ${POTBS_VERSION_SERVER} available.\n\nInstall update?" 8 78); then
-        #if (zenity --question --title="Current version NOT updated" --text "version ${POTBS_VERSION_SERVER} available.\n\nInstall update?" --no-wrap --ok-label "Yes" --cancel-label "No"); then
         if (dialog_yesno "Current version NOT updated" "version ${POTBS_VERSION_SERVER} available.\n\nInstall update?");then
             patchinstall
             checklocalfiles
@@ -537,7 +536,8 @@ rungame(){
     fi
 
     cd "${potbs_dir}" || { echo "[err] cd to ${potbs_dir}";exit 1; }
-    DXVK_LOG_LEVEL="none" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine PotBS.exe &
+    env DXVK_LOG_LEVEL="none" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" nohup wine PotBS.exe &>/dev/null &
+    sleep 2
 
 }
 
@@ -613,11 +613,9 @@ create_desktop(){
 
 cat << EOF > PotBS.desktop
 [Desktop Entry]
-Encoding=UTF-8
 Type=Application
 Name=PotBS
 Comment=PotBS Linux Launcher
-Categories=Games;
 Exec=${work_dir}/launcher.sh
 Icon=${work_dir}/PotBS.png
 Terminal=true
