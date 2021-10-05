@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20211005
+version=20211005-1
 
 #### EDIT THIS SETTINGS ####
 
@@ -82,6 +82,8 @@ debug() {
 # verify launcher dir and bin
 verifying(){
     local error=0
+
+    type "wget" >/dev/null 2>&1 || { echo >&2 "[ERR] No wget found."; error=1; }
     type "${jq}" >/dev/null 2>&1 || { echo >&2 "[ERR] No jq found."; error=1; }
     type "${hash}" >/dev/null 2>&1 || { echo >&2 "[ERR] No hash found."; error=1; }
 
@@ -98,10 +100,10 @@ verifying(){
 
 # $1 - "{owner}/{repo}"
 get_latest_release() {
-    #curl --silent "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
+    #wget --quiet -O - "https://api.github.com/repos/$1/releases/latest" | # Get latest release from GitHub api
     #grep '"tag_name":' |                                            # Get tag line
     #sed -E 's/.*"([^"]+)".*/\1/'                                    # Pluck JSON value
-    curl --silent "https://api.github.com/repos/$1/releases/latest" | "${jq}" -r '.tag_name'
+    wget --quiet -O - "https://api.github.com/repos/$1/releases/latest" | "${jq}" -r '.tag_name'
 
 }
 
@@ -179,7 +181,7 @@ patchinstall(){
     fi
 
     echo "Cheking patches ${POTBS_VERSION_INSTALLED} to ${POTBS_VERSION_SERVER} ..."
-    patchesindex=$(curl -s "${potbs_url}/Patches/patches_index.json")
+    patchesindex=$(wget --quiet -O - "${potbs_url}/Patches/patches_index.json")
     echo "${patchesindex}" | grep "Not Found" > /dev/null
     if [ $? -eq 0 ];then
         echo "[ERR] patches_index.json not found"
@@ -199,7 +201,7 @@ patchinstall(){
         if [ -z "${patchTo}" ];then
             # Если не нашли патча, а текущая версия предпоследняя, то можем сами подставить версию
             # ситуация когда Vision сломали patches_index.json
-            prerel=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-2]')
+            prerel=$(wget --quiet -O - "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-2]')
             if [ "${prerel}" == "${POTBS_VERSION_INSTALLED}" ];then
                 patchTo="${POTBS_VERSION_SERVER}"
             else
@@ -216,7 +218,7 @@ patchinstall(){
         patchName="${POTBS_VERSION_INSTALLED}_${patchTo}"
         debug "patchName: ${patchName}"
 
-        patchlist=$(curl -s "${potbs_url}/Patches/${patchName}.json")
+        patchlist=$(wget --quiet -O - "${potbs_url}/Patches/${patchName}.json")
         echo "${patchlist}" | grep "Not Found" > /dev/null
         if [ $? -eq 0 ];then
             echo "[ERR] Patch ${patchName}.json not found"
@@ -286,7 +288,7 @@ checkupdate(){
     echo "Server Version: ${POTBS_VERSION_SERVER}"
 
     currenthash=$(cat "${potbs_dir}/version.data")
-    buildhash=$(curl -s "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/version.data")
+    buildhash=$(wget --quiet -O - "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/version.data")
 
     if [ "${currenthash}" = "${buildhash}" ];then
         echo "Current version last updated"
@@ -309,7 +311,7 @@ checkupdate(){
 # determine server game version
 # and write it to POTBS_VERSION_SERVER
 getServerVersion(){
-    POTBS_VERSION_SERVER=$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
+    POTBS_VERSION_SERVER=$(wget --quiet -O - "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
     if [ -n "$POTBS_VERSION_SERVER" ];then
         return 0
     else
@@ -360,13 +362,13 @@ getlocalversion(){
     # get an array of all versions
     oldIFS=$IFS
     IFS=', ' # разделитель запятая или пробел
-    read -r -a allbuilds <<< "$(curl -s "${potbs_url}/Builds/builds_index.json" | "${jq}" -r -c '.["AvailableBuilds"]' | sed 's/\[//' | sed 's/]//' | sed 's/"//g')"
+    read -r -a allbuilds <<< "$(wget --quiet -O - "${potbs_url}/Builds/builds_index.json" | "${jq}" -r -c '.["AvailableBuilds"]' | sed 's/\[//' | sed 's/]//' | sed 's/"//g')"
     IFS=$oldIFS
 
     debug "read allbuilds finish"
 
     for build in "${allbuilds[@]}"; do
-        buildhash=$(curl -s "${potbs_url}/Builds/${build}/version.data")
+        buildhash=$(wget --quiet -O - "${potbs_url}/Builds/${build}/version.data")
 
         echo "${buildhash}" | grep "Not Found" > /dev/null
         if [ $? -eq 0 ];then
@@ -401,7 +403,7 @@ checklocalfiles(){
 
     echo "Checking files started..."
 
-    curl -s "${potbs_url}/Builds/build_${POTBS_VERSION_INSTALLED}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${hashFile}"
+    wget --quiet -O - "${potbs_url}/Builds/build_${POTBS_VERSION_INSTALLED}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${hashFile}"
 
     cd "${potbs_dir}" || exit
 
@@ -551,10 +553,10 @@ downloadLocale(){
     echo "Download Updated RU locale"
 
     rm "${potbs_dir}/locale/ru_ru_data.dat"
-    wget -c -nH -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dat"
+    wget -c -nH -q --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dat"
 
     rm "${potbs_dir}/locale/ru_ru_data.dir"
-    wget -c -nH -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dir"
+    wget -c -nH -q --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dir"
 
 }
 
@@ -583,7 +585,7 @@ install_dxvk(){
     echo "Remove old dxvk*"
     rm -R "${data_dir}"/dxvk-*
 
-    taginfo=$(curl --silent "https://api.github.com/repos/${repo}/releases/tags/${latestTag}")
+    taginfo=$(wget --quiet -O - "https://api.github.com/repos/${repo}/releases/tags/${latestTag}")
     debug "$taginfo"
     file_uri=$(echo "$taginfo" | "${jq}" -r '.assets[0].browser_download_url')
     file_name=$(echo "$taginfo" | "${jq}" -r '.assets[0].name')
@@ -591,7 +593,9 @@ install_dxvk(){
     echo "Download ${latestTag} to ${data_dir}/${file_name}"
     debug "from ${file_uri}"
     echo ""
-    curl -fSL "${file_uri}" -o "${data_dir}/${file_name}"
+
+    #curl -fSL "${file_uri}" -o "${data_dir}/${file_name}"
+    wget -c -nH -q --show-progress -P "${data_dir}" "${file_uri}"
 
     echo "Extract tar.gz ..."
 
@@ -601,7 +605,6 @@ install_dxvk(){
         #return
         exit 1
     fi
-    #tar -xvf ${data_dir}/${file_name} dxvk-1.9.1/x64/d3d9.dll
 
     tar -C "${data_dir}" -xvf "${data_dir}/${file_name}"
     if [ $? -ne 0 ];then

@@ -3,7 +3,6 @@
 Script to simplify wine environment creation, download, run game and check for updates.
 
 ## Dependencies
- - curl 
  - wget
  - winetrics (optional)
 
