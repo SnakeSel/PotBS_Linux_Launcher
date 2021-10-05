@@ -23,6 +23,8 @@ command:
  - d  - dowload game
  - u  - check for updates and install it
  - c  - check local files for compliance
+ - dxvk - install dxvk
+ - desc - create desktop entry
 
 #### Example clean install:
 1. Create new wineprefix and installing dependencies: `./launcher.sh n`

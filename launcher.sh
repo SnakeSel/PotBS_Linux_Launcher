@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20210831
+version=20211005
 
 #### EDIT THIS SETTINGS ####
 
@@ -58,7 +58,7 @@ command:
     c  check local files for compliance
     p  apply 4gb patch
     l  download updated locale files (RU only)
-    dx install dxvk
+    dxvk install dxvk
     desc create desktop entry
 
 examples:
@@ -535,8 +535,14 @@ rungame(){
 
     fi
 
+    if [ "${debugging:-0}" -eq 1 ]; then
+        local PARAM=(DXVK_HUD="devinfo,memory,fps,version," DXVK_LOG_LEVEL="info")
+    else
+        local PARAM=(DXVK_LOG_LEVEL="none")
+    fi
+
     cd "${potbs_dir}" || { echo "[err] cd to ${potbs_dir}";exit 1; }
-    env DXVK_LOG_LEVEL="none" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" nohup wine PotBS.exe &>/dev/null &
+    env "${PARAM[@]}" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" nohup wine PotBS.exe &>/dev/null &
     sleep 2
 
 }
@@ -573,6 +579,9 @@ install_dxvk(){
     echo "Get release DXVK ..."
     latestTag=$(get_latest_release "$repo")
     echo "Latest version: ${latestTag}"
+
+    echo "Remove old dxvk*"
+    rm -R "${data_dir}"/dxvk-*
 
     taginfo=$(curl --silent "https://api.github.com/repos/${repo}/releases/tags/${latestTag}")
     debug "$taginfo"
@@ -681,7 +690,7 @@ case "$1" in
     r) rungame;;
     l) downloadLocale;;
     p) apply4gb;;
-    dx) install_dxvk;;
+    dxvk) install_dxvk;;
     desc) create_desktop;;
     *) help;;
 esac
