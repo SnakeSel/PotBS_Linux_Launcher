@@ -6,20 +6,27 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20211005-1
+version=20230305
 
 #### EDIT THIS SETTINGS ####
+potbs_wineprefix="$HOME/.local/winepfx/PotBS"
+#potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
+potbs_dir="${HOME}/Games/PotBS"
 
-#potbs_wineprefix="$HOME/.PlayOnLinux/wineprefix/PotBS"
-potbs_wineprefix="$HOME/PotBS"
-potbs_dir="${potbs_wineprefix}/drive_c/PotBS"
+# If LEGACY client
+POTBSLEGACY=0
+
+WINE="wine"
+#WINE="${HOME}/.local/wine/wine-tkg/bin/wine"
+#WINE="${HOME}/.local/wine/Wine-GE/bin/wine"
 
 # win64 | win32
-WINEARCH=win32
+WINEARCH=win64
 
 # show debug msg
 #debugging=1
-# use test, not apply change
+
+# use test mode, not apply change
 #testing=1
 
 #### NOT EDIT ##############
@@ -30,9 +37,6 @@ abs_filename=$(readlink -e "$0")
 work_dir=$(dirname "$abs_filename")
 bin_dir="${work_dir}/bin"
 data_dir="${work_dir}/data"
-
-potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
-
 buildsversion="${data_dir}/builds"
 corruptedfiles="${data_dir}/corrupted"
 
@@ -40,11 +44,40 @@ jq="${bin_dir}/jq-linux64"
 hash="${bin_dir}/potbs_hash"
 patch4gb="${bin_dir}/4gb_patch.exe"
 
+potbs_url="https://cdn.visiononlinegames.com/potbs/launcher"
+legacy_url="https://cdn.visiononlinegames.com/potbs/legacy/launcher"
 
 POTBS_VERSION_INSTALLED=""
 POTBS_VERSION_SERVER=""
 POTBS_UPDATE_REQUIRED=0
 ######################################################
+## Colors
+ClRed=$(tput setaf 1)
+ClGreen=$(tput setaf 2)
+ClYellow=$(tput setaf 3)
+#ClBlue=$(tput setaf 4)
+ClMagenta=$(tput setaf 5)
+ClCyan=$(tput setaf 6)
+#ClWhite=$(tput setaf 7)
+Clreset=$(tput sgr0) #сброс цвета на стандартный
+#Cltoend=$(tput hpa $(tput cols))$(tput cub 6) # сдвигает послед. текст до конца экрана
+######################################################
+press_and_cont(){
+    echo ""
+    read -n 1 -s -r -p "Press any key to continue."
+    echo ""
+}
+
+echo_err(){
+    echo -e "${ClRed}[ERR] ${1}${Clreset}"
+    press_and_cont
+}
+echo_wrn(){
+    echo -e "${ClYellow}[WRN] ${1}${Clreset}"
+}
+echo_ok(){
+    echo -e "${ClGreen}${1} OK${Clreset}"
+}
 
 help(){
     cat << EOF
@@ -60,6 +93,7 @@ command:
     l  download updated locale files (RU only)
     dxvk install dxvk
     desc create desktop entry
+    cfg launch winecfg
 
 examples:
 Run game:
@@ -133,21 +167,6 @@ dialog_yesno(){
 
 }
 
-# Full dowload potbs
-fullinstall(){
-    getServerVersion
-
-    echo "Install PotBS ${POTBS_VERSION_SERVER}"
-    echo "to: ${potbs_dir}"
-    #wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -o wget.txt  -P "${potbs_dir}/test" --reject="index.html*" "${potbs_url}/Builds/${build}/"
-    wget -c -r -nH --cut-dirs=4 --no-parent --show-progress -P "${potbs_dir}" --reject="index.html*" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/"
-    if [ $? -eq 0 ];then
-        echo "Game version ${POTBS_VERSION_SERVER} installed"
-    else
-        echo "Error download"
-    fi
-
-}
 
 # since applying patches requires a separate application, then
 # read the modified files and download them entirely
@@ -196,6 +215,8 @@ patchinstall(){
         else
             patchTo=$(echo "${patchesindex}" | "${jq}" -r --arg POTBS_VERSION_INSTALLED "${POTBS_VERSION_INSTALLED}" '.["Patches"] | .[] | select(.From==$POTBS_VERSION_INSTALLED) |.To' 2> /dev/null )
         fi
+        # echo '''
+
 
         debug "patchTo: ${patchTo}"
         if [ -z "${patchTo}" ];then
@@ -234,6 +255,8 @@ patchinstall(){
         pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
         debug "pathAdd: $pathAdd"
 
+        # echo '''
+
         echo "Apply the patch ..."
 
         # Если тестируем то пропускаем примененеие
@@ -253,13 +276,13 @@ patchinstall(){
                 fi
                 filedir=$(dirname "$fullfile")
                 rm -f "${potbs_dir}/${fullfile}"
-                wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${patchTo}/${fullfile}"
+                wget -c -nH -q --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${patchTo}/${fullfile}"
             done < <(printf '%s\n' "$pathUpdate")
 
             echo "Download added files"
             while read -r fullfile;do
                 filedir=$(dirname "$fullfile")
-                wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${patchTo}/${fullfile}"
+                wget -c -nH -q --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${patchTo}/${fullfile}"
             done < <(printf '%s\n' "${pathAdd}")
         fi
 
@@ -311,6 +334,7 @@ checkupdate(){
 # determine server game version
 # and write it to POTBS_VERSION_SERVER
 getServerVersion(){
+    debug "getServerVersion"
     POTBS_VERSION_SERVER=$(wget --quiet -O - "${potbs_url}/Builds/builds_index.json" | "${jq}" -r '.["AvailableBuilds"] | .[-1]')
     if [ -n "$POTBS_VERSION_SERVER" ];then
         return 0
@@ -325,6 +349,7 @@ getServerVersion(){
 # and write it to POTBS_VERSION_INSTALLED
 getlocalversion(){
     # get version hash installed game
+    debug "getlocalversion"
     localhash=$(cat "${potbs_dir}/version.data")
     if [ $? -ne 0 ];then
         echo "[ERR] Not found: ${potbs_dir}/version.data"
@@ -401,7 +426,7 @@ checklocalfiles(){
     getlocalversion
     hashFile="${data_dir}/hashsum_${POTBS_VERSION_INSTALLED}"
 
-    echo "Checking files started..."
+    echo "${ClMagenta}Checking game files started...${Clreset}"
 
     wget --quiet -O - "${potbs_url}/Builds/build_${POTBS_VERSION_INSTALLED}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${hashFile}"
 
@@ -410,7 +435,7 @@ checklocalfiles(){
     "${hash}" -c "${hashFile}" | grep "FAIL" | tee "${corruptedfiles}"
     if [ ! -s "${corruptedfiles}" ];then
         echo "No corrupted file"
-        rm -f "${corruptedfiles}"
+        #rm -f "${corruptedfiles}"
         cd "${work_dir}" || exit
         return
     fi
@@ -427,7 +452,7 @@ checklocalfiles(){
                     #filename=$(basename "$fullfile")
                     filedir=$(dirname "$fullfile")
                     rm -f "${potbs_dir}/${fullfile}"
-                    wget -c -nH -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
+                    wget -c -nH -q --show-progress -P "${potbs_dir}/${filedir}" "${potbs_url}/Builds/${POTBS_VERSION_INSTALLED}/${fullfile}"
                 done < "${corruptedfiles}"
                 rm -f "${corruptedfiles}"
                 break;;
@@ -439,48 +464,36 @@ checklocalfiles(){
 }
 
 
-createwineprefix(){
+# Full dowload potbs
+fullinstall(){
+    getServerVersion
 
-    type wine >/dev/null 2>&1 || { echo >&2 "[Warn] No wine found.  Aborting."; return; }
-
-    winever=$(wine --version)
-    if [ $? -ne 0 ];then
-        echo "[ERR] Wine not found"
-        read -r -p "Any key to continue"
-        return
+    local _cutdirs
+    _cutdirs=4
+    if [ "${POTBSLEGACY:-0}" -eq 1 ]; then
+        _cutdirs=5
     fi
 
-    echo "Create new wineprefix..."
-    echo "${winever}, WINEARCH=${WINEARCH}"
-    echo ""
-    echo "Enter patch to wineprefix or empty to default"
-    read -e -r -p "(default patch: ${potbs_wineprefix}) :"  ptch
-    if [ "${ptch}" != "" ];then
-        potbs_wineprefix=${ptch}
-    fi
-    echo "Init wine to ${potbs_wineprefix}"
-
-    #WINEARCH=win32 WINEPREFIX="${potbs_wineprefix}" winecfg
-    #WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot --init
-    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot -u
-    if [ $? -ne 0 ];then
-        echo "[ERR] Create wineprefix"
-        read -r -p "Any key to continue"
-        return
+    echo "Install PotBS ${POTBS_VERSION_SERVER}"
+    echo "to: ${potbs_dir}"
+    wget -c -r -nH --cut-dirs=${_cutdirs} --no-parent -q --show-progress -P "${potbs_dir}" --reject="index.html*" "${potbs_url}/Builds/${POTBS_VERSION_SERVER}/"
+    if [ $? -eq 0 ];then
+        echo_ok "Game version ${POTBS_VERSION_SERVER} installed"
+    else
+        echo_err "Error download"
     fi
 
-    type winetricks >/dev/null 2>&1 || { echo >&2 "[Warn] No winetricks found.  Aborting."; return; }
+    checklocalfiles
+}
 
-    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" winetricks -q d3dx9 d3dcompiler_43
-    #if [ $? -ne 0 ];then
-    #    echo "[ERR] no install d3dx9 d3dcompiler_43"
-    #    read -r -p "Any key to continue"
-    #    return
-    #fi
+winetricksInstall(){
+    debug "WINEARCH=\"${WINEARCH}\" WINEPREFIX=\"${potbs_wineprefix}\" WINE=\"${WINE}\" winetricks -q -f $1"
+    env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" WINE="${WINE}" winetricks -q -f "$1"
+}
 
-    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" winetricks -q vcrun2019
-    if [ $? -ne 0 ];then
-        echo "[ERR] no install vcrun2019"
+
+installDependence(){
+    cont(){
         echo ""
         while true; do
         read -r -p "Continue install? (y\n):" yn
@@ -488,41 +501,108 @@ createwineprefix(){
             [Yy]* )
                 break;;
             [Nn]* )
-                return
+                exit 1
                 break;;
             * ) echo "Please answer yes or no.";;
         esac
         done
+    }
 
+    if ! type winetricks >/dev/null 2>&1;then
+        echo_err "No winetricks found. Aborting."
+        return 1
     fi
 
-    debug "WINEARCH=\"${WINEARCH}\" WINEPREFIX=\"${potbs_wineprefix}\" winetricks -q \"${work_dir}\"/PhysxLegacy.verb"
-    WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" winetricks -q "${work_dir}/PhysxLegacy.verb"
-    if [ $? -ne 0 ];then
-        echo "[ERR] no install PhysX"
-        read -r -p "Any key to continue"
-        return
+    if ! winetricksInstall "d3dx9";then
+        echo_err "d3dx9 NOT installed"
+        cont
     fi
 
-    echo "Wineprefix create success!"
+    if ! winetricksInstall "d3dcompiler_43";then
+        echo_err "d3dcompiler_43 NOT installed"
+        cont
+    fi
+
+    if ! winetricksInstall "vcrun2019";then
+        echo_err "vcrun2019 NOT installed"
+        cont
+    fi
+
+    if ! winetricksInstall "${work_dir}/PhysxLegacy.verb";then
+        echo_err "PhysxLegacy NOT installed"
+        cont
+    fi
+
+    return 0
+}
+
+createwineprefix(){
+    echo "${ClMagenta}Create new wineprefix...${Clreset}"
+
+    if ! type "${WINE}" >/dev/null 2>&1;then
+        echo_err "No wine found.  Aborting."
+        return 1
+    fi
+
+    if ! winever=$("${WINE}" --version);then
+        echo_err "Wine not found"
+        return 1
+    fi
+
+    echo "${winever}, WINEARCH=${WINEARCH}"
     echo ""
-    while true; do
-        read -r -p "Download Full Game? (y\n):" yn
-        case $yn in
-            [Yy]* )
-                fullinstall
-                break;;
-            [Nn]* ) break;;
-            * ) echo "Please answer yes or no.";;
-        esac
-    done
+    echo "${ClCyan}Enter patch to wineprefix or empty to default${Clreset}"
+    read -e -r -p "(default patch: ${potbs_wineprefix}) :"  ptch
+    if [ "${ptch}" != "" ];then
+        potbs_wineprefix=${ptch}
+    fi
+    echo "Init wine to ${potbs_wineprefix}"
 
-    #read -p "Any key to continue"
-    return
+    if ! [ -d "${potbs_wineprefix}" ]; then
+        mkdir -p "${potbs_wineprefix}"
+    fi
+
+
+    #WINEARCH="${WINEARCH}" WINEPREFIX="${potbs_wineprefix}" wineboot --init
+    if ! env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" ${WINE} wineboot -u;then
+        echo_err "Create wineprefix"
+        return 1
+    fi
+
+    echo "${ClMagenta}install Dependence...${Clreset}"
+    if ! installDependence;then
+        echo_err "Dependence NOT installed. Aborted"
+        return 1
+    fi
+
+    echo "--------------------------"
+    echo_ok "Wineprefix create"
+
+    if ! [ -f "${potbs_dir}/PotBS.exe" ];then 
+        echo "${ClMagenta}Download Game...${Clreset}"
+        while true; do
+            read -r -p "Download Full Game? (y\n):" yn
+            case $yn in
+                [Yy]* )
+                    fullinstall
+                    break;;
+                [Nn]* ) break;;
+                * ) echo "Please answer yes or no.";;
+            esac
+        done
+    fi
+
+    return 0
 
 }
 
 rungame(){
+    if ! [ -f "${potbs_wineprefix}/system.reg" ];then
+        if ! createwineprefix;then
+            return 1
+        fi
+    fi
+
     checkupdate
 
     if [ "${POTBS_UPDATE_REQUIRED}" -eq 1 ]; then
@@ -538,19 +618,23 @@ rungame(){
     fi
 
     if [ "${debugging:-0}" -eq 1 ]; then
-        local PARAM=(DXVK_HUD="devinfo,memory,fps,version," DXVK_LOG_LEVEL="info")
+        local PARAM=(DXVK_HUD="devinfo,fps,version," DXVK_LOG_LEVEL="info")
+        local WINEDEBUG="fixme-all,err+loaddll,err+dll,err+file,err+reg"
+        local out="${potbs_dir}/PotBS.exe.log"
     else
         local PARAM=(DXVK_LOG_LEVEL="none")
+        local WINEDEBUG="-all"
+        local out="/dev/null"
     fi
 
     cd "${potbs_dir}" || { echo "[err] cd to ${potbs_dir}";exit 1; }
-    env "${PARAM[@]}" WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" nohup wine PotBS.exe &>/dev/null &
+    env "${PARAM[@]}" WINEARCH="${WINEARCH}" WINEDEBUG="${WINEDEBUG}" WINEPREFIX="${potbs_wineprefix}" WINE_LARGE_ADDRESS_AWARE=1 nohup "${WINE}" PotBS.exe &>"${out}" &
     sleep 2
 
 }
 
 downloadLocale(){
-    echo "Download Updated RU locale"
+    echo "${ClMagenta}Download Updated RU locale${Clreset}"
 
     rm "${potbs_dir}/locale/ru_ru_data.dat"
     wget -c -nH -q --show-progress -P "${potbs_dir}/locale" "https://github.com/SnakeSel/PotBS_Russian/raw/master/ru_ru_data.dat"
@@ -561,22 +645,24 @@ downloadLocale(){
 }
 
 apply4gb(){
-    echo "apply 4gb patch to PotBS.exe"
+    echo "${ClMagenta}Apply 4gb patch to PotBS.exe${Clreset}"
 
     if [ ! -f "${patch4gb}" ];then
-        echo "[ERR] patch not found in: ${patch4gb}"
-        read -r -p "Any key to exit"
-        #return
+        echo_err "4gb patch not found in: ${patch4gb}"
         exit 1
     fi
 
-    WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" wine "${patch4gb}" "${potbs_dir}/PotBS.exe"
-
+    if WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" ${WINE} "${patch4gb}" "${potbs_dir}/PotBS.exe";then
+        echo_ok "4gb patch"
+    else
+        echo_err "4gb patch NOT apply"
+        exit 1
+    fi
 
 }
 
-install_dxvk(){
-    repo="doitsujin/dxvk"
+installDXVKgit(){
+    local repo="doitsujin/dxvk"
 
     echo "Get release DXVK ..."
     latestTag=$(get_latest_release "$repo")
@@ -594,7 +680,6 @@ install_dxvk(){
     debug "from ${file_uri}"
     echo ""
 
-    #curl -fSL "${file_uri}" -o "${data_dir}/${file_name}"
     wget -c -nH -q --show-progress -P "${data_dir}" "${file_uri}"
 
     echo "Extract tar.gz ..."
@@ -621,6 +706,17 @@ install_dxvk(){
 
 }
 
+install_dxvk(){
+    if type winetricks >/dev/null 2>&1;then
+        if ! winetricksInstall "dxvk";then
+            echo_err "dxvk NOT installed"
+            return 1
+        fi
+    else
+        installDXVKgit
+    fi
+}
+
 create_desktop(){
 
 cat << EOF > PotBS.desktop
@@ -637,11 +733,31 @@ chmod +x PotBS.desktop
 
 }
 
+show_version(){
+    getlocalversion
+    echo -e "
+${ClMagenta}PotBS launcher from SnakeSel${Clreset}
+version: ${version}
+
+${ClCyan}PotBS version: ${POTBS_VERSION_INSTALLED}${Clreset}
+PotBS game dir: ${potbs_dir}
+
+wine:\t$WINE
+pfx:\t${potbs_wineprefix}
+arch:\t$WINEARCH
+"
+}
+
 #####################################################################################
 # verify launcher dir and bin
 verifying
 
-#Если параметр 1 не существует, ошибка
+if [ "${POTBSLEGACY:-0}" -eq 1 ]; then
+    echo "${ClMagenta}Legacy client${Clreset}"
+    potbs_url="$legacy_url"
+fi
+
+#Если параметр 1 не существует, запуск игры
 if [ -z "$1" ]
 then
     rungame
@@ -649,20 +765,9 @@ then
 fi
 
 case "$1" in
-    v)
-        getlocalversion
-        if [ "${POTBS_VERSION_INSTALLED}" == "" ];then
-            echo "[ERR] Installed Game verison unspecified"
-            exit 1
-        fi
-        echo "PotBS Installed: ${POTBS_VERSION_INSTALLED}"
-        echo "Launcher: ${version}"
-    ;;
+    v) show_version;;
     n) createwineprefix;;
-    d)
-        fullinstall
-        checklocalfiles
-    ;;
+    d) fullinstall;;
     u)
         if [ "${testing:-0}" -eq 1 ];then
             POTBS_UPDATE_REQUIRED=1
@@ -695,6 +800,8 @@ case "$1" in
     p) apply4gb;;
     dxvk) install_dxvk;;
     desc) create_desktop;;
+    cfg) env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" "${WINE}" winecfg;;
+    reg) env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${potbs_wineprefix}" "${WINE}" regedit;;
     *) help;;
 esac
 

@@ -7,9 +7,12 @@ Script to simplify wine environment creation, download, run game and check for u
  - winetrics (optional)
 
 ## Install
-1. Set the variable `potbs_wineprefix` of your choice.  
-    If the game is already installed, check the correct path in the variable `potbs_dir` (defauilt: "${potbs_wineprefix}/drive_c/PotBS")
-2. Grant execution rights for files: `chmod +x launcher.sh jq-linux64 potbs_hash`
+1. Customize the script as you wish.
+    Main settings:
+    * `potbs_wineprefix` = path to wineprefix directory (default: "${HOME}/.local/winepfx/PotBS")
+    * `potbs_dir` = path to game directory (default: "${HOME}/Games/PotBS")
+    * `POTBSLEGACY` = set to 1 if you want to load legacy game. NOT TESTED (default: 0)
+2. Grant execution rights for files: `chmod +x launcher.sh bin/jq-linux64 bin/potbs_hash`
 3. Run `./launcher.sh`
 
 
@@ -24,6 +27,7 @@ command:
  - c  - check local files for compliance
  - dxvk - install dxvk
  - desc - create desktop entry
+ - cfg - launch winecfg
 
 #### Example clean install:
 1. Create new wineprefix and installing dependencies: `./launcher.sh n`
