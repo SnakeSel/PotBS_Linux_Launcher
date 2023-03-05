@@ -38,3 +38,19 @@ command:
 To successfully launch the game for wine, install:
  - d3dx9, d3dcompiler_43 from WineTricks
  - [PhysX legacy](https://www.nvidia.com/en-us/drivers/physx/physx-9-13-0604-legacy-driver/) (`winetricks -q PhysxLegacy.verb`)
+
+## ERROR Memory: memory allocation failed for pool Main.Default
+Try lowering the `[MemoryPools]` `preSize_*` settings in the `pirates.ini` file.
+It is better to create an additional settings file `pirates_local.ini` and add to it:
+```
+[MemoryPools]
+;; size in MB
+preSize_Bootstrap=2
+preSize_Default=256
+preSize_Image=486
+preSize_Vertex=128
+preSize_Audio=64
+preSize_Room=486
+preSize_UI=64
+preSize_Anim=486
+```
