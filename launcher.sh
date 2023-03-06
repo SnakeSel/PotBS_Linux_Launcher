@@ -6,7 +6,7 @@
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20230305
+version=20230306
 
 #### EDIT THIS SETTINGS ####
 potbs_wineprefix="$HOME/.local/winepfx/PotBS"
@@ -430,6 +430,17 @@ checklocalfiles(){
 
     wget --quiet -O - "${potbs_url}/Builds/build_${POTBS_VERSION_INSTALLED}.json" | "${jq}" -r '.["Entries"] | .[] | {"Hash","RelativePath"} | join("  ")' > "${hashFile}"
 
+    # TMP FIX DUBLICAT FILE ENTRIE
+    local _tmphash
+    _tmphash="${hashFile}_tmp"
+    mv "${hashFile}" "${_tmphash}"
+    # copy unique entrie
+    sort -k2 "${_tmphash}" | uniq -u --skip-fields=1 > "${hashFile}"
+    # copy last non uniq entrie
+    sort -k2 "${_tmphash}" | uniq -d --skip-fields=1 >> "${hashFile}"
+    rm -f "${_tmphash}"
+    # /END TMP
+
     cd "${potbs_dir}" || exit
 
     "${hash}" -c "${hashFile}" | grep "FAIL" | tee "${corruptedfiles}"
@@ -628,9 +639,8 @@ rungame(){
     fi
 
     cd "${potbs_dir}" || { echo "[err] cd to ${potbs_dir}";exit 1; }
-    env "${PARAM[@]}" WINEARCH="${WINEARCH}" WINEDEBUG="${WINEDEBUG}" WINEPREFIX="${potbs_wineprefix}" WINE_LARGE_ADDRESS_AWARE=1 nohup "${WINE}" PotBS.exe &>"${out}" &
+    env "${PARAM[@]}" WINEARCH="${WINEARCH}" WINEDEBUG="${WINEDEBUG}" WINEPREFIX="${potbs_wineprefix}"  WINE_LARGE_ADDRESS_AWARE=1 nohup "${WINE}" PotBS.exe &>"${out}" &
     sleep 2
-
 }
 
 downloadLocale(){
