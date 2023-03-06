@@ -435,7 +435,7 @@ checklocalfiles(){
     "${hash}" -c "${hashFile}" | grep "FAIL" | tee "${corruptedfiles}"
     if [ ! -s "${corruptedfiles}" ];then
         echo_ok "No corrupted file. "
-        #rm -f "${corruptedfiles}"
+        rm -f "${corruptedfiles}"
         cd "${work_dir}" || exit
         return
     fi

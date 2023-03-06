@@ -1,4 +1,3 @@
-
 # PotBS Linux Launcher
 Script to simplify wine environment creation, download, run game and check for updates.
 
@@ -40,7 +39,7 @@ To successfully launch the game for wine, install:
  - [PhysX legacy](https://www.nvidia.com/en-us/drivers/physx/physx-9-13-0604-legacy-driver/) (`winetricks -q PhysxLegacy.verb`)
 
 ## ERROR Memory: memory allocation failed for pool Main.Default
-Try lowering the `[MemoryPools]` `preSize_*` settings in the `pirates.ini` file.
+Try lowering the `[MemoryPools]` `preSize_*` settings in the `pirates.ini` file.  
 It is better to create an additional settings file `pirates_local.ini` and add to it:
 ```
 [MemoryPools]
