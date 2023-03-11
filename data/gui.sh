@@ -5,6 +5,28 @@ GUI=1
 uiTitle="PotBS Linux Launcher"
 uiIcon="${DATA_DIR}/PotBS.png"
 
+
+create_desktopUI(){
+cat << EOF > PotBS.desktop
+[Desktop Entry]
+Type=Application
+Name=PotBS
+Comment=PotBS Linux Launcher
+Exec=${work_dir}/launcher.sh gui
+Icon=${DATA_DIR}/PotBS.png
+Terminal=false
+EOF
+
+    chmod +x PotBS.desktop
+
+    if type "xdg-user-dir" >/dev/null 2>&1;then
+        local desctopDir
+        desctopDir=$(xdg-user-dir "DESKTOP")
+        cp -f "PotBS.desktop" "${desctopDir}"
+    fi
+
+}
+
 downloadlangUI(){
     potsb_downloadLocale "${POTBS_DIR}" | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --no-cancel
 }
@@ -79,7 +101,8 @@ otherUI(){
             1 "Install DXVK" \
             2 "Download updated locale files" \
             3 "Launch winecfg" \
-            3 "Debug" \
+            4 "Create desktop link" \
+            9 "Debug" \
         )
     then
         return
@@ -90,6 +113,7 @@ otherUI(){
             "Install DXVK") install_dxvk | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --text="install DXVK..." --no-cancel --auto-close;;
             "Download updated locale files") downloadlangUI;;
             "Launch winecfg") env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${WINEPREFIX}" "${WINE}" winecfg;;
+            "Create desktop link") create_desktopUI;;
             *) echo "$ans";;
     esac
 

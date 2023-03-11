@@ -34,8 +34,8 @@ POTBS_DIR="${HOME}/Games/PotBS"
 # If LEGACY client
 POTBSLEGACY=0
 
-WINE="wine"
-#WINE="${HOME}/.local/wine/wine-tkg/bin/wine"
+#WINE="wine"
+WINE="${HOME}/.local/wine/wine-tkg/bin/wine"
 
 WINEPREFIX="$HOME/.local/winepfx/PotBS"
 
@@ -312,7 +312,8 @@ rungame(){
             else
                 exit 1
             fi
-
+        else
+            echo_ok "Update not required."
         fi
     fi
 
@@ -362,11 +363,16 @@ Type=Application
 Name=PotBS
 Comment=PotBS Linux Launcher
 Exec=${work_dir}/launcher.sh
-Icon=${work_dir}/PotBS.png
+Icon=${DATA_DIR}/PotBS.png
 Terminal=true
 EOF
 
-chmod +x PotBS.desktop
+    chmod +x PotBS.desktop
+    if type "xdg-user-dir" >/dev/null 2>&1;then
+        local desctopDir
+        desctopDir=$(xdg-user-dir "DESKTOP")
+        cp -f "PotBS.desktop" "${desctopDir}"
+    fi
 
 }
 

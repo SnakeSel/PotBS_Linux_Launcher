@@ -96,7 +96,7 @@ potbs_getlocalversion(){
 
     # create Builds file
     if ! [ -f "${BUILDSHASHFILE}" ];then
-        if ! createBuildsHash "${BUILDSHASHFILE}";then
+        if ! potbs_createBuildsHash "${BUILDSHASHFILE}";then
             echo "createBuildsHash ${BUILDSHASHFILE}"
             return 1
         fi
@@ -112,7 +112,7 @@ potbs_getlocalversion(){
     echo "Builds file does not contain version" >&2
     echo "recreate Builds file" >&2
 
-    if ! createBuildsHash "${BUILDSHASHFILE}";then
+    if ! potbs_createBuildsHash "${BUILDSHASHFILE}";then
         echo "createBuildsHash ${BUILDSHASHFILE}"
         return 1
     fi
