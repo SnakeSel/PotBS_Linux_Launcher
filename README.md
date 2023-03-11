@@ -2,15 +2,17 @@
 Script to simplify wine environment creation, download, run game and check for updates.
 
 ## Dependencies
+ - wine
  - wget
- - winetrics (optional)
+ - winetrics
+ - zenity (optional for GUI)
 
 ## Install
 1. Customize the script as you wish.
     Main settings:
     * `potbs_wineprefix` = path to wineprefix directory (default: "${HOME}/.local/winepfx/PotBS")
     * `potbs_dir` = path to game directory (default: "${HOME}/Games/PotBS")
-    * `POTBSLEGACY` = set to 1 if you want to load legacy game. NOT TESTED (default: 0)
+    * `POTBSLEGACY` = set to 1 if you want to load legacy game. (default: 0)
 2. Grant execution rights for files: `chmod +x launcher.sh bin/jq-linux64 bin/potbs_hash`
 3. Run `./launcher.sh`
 
@@ -27,6 +29,7 @@ command:
  - dxvk - install dxvk
  - desc - create desktop entry
  - cfg - launch winecfg
+ - gui - lauch GUI mode (develop)
 
 #### Example clean install:
 1. Create new wineprefix and installing dependencies: `./launcher.sh n`
