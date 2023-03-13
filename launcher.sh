@@ -27,15 +27,15 @@ for module in "${modules[@]}"; do
 done
 
 ############################
-### EDIT THIS SETTINGS ####
-
+### DEFAULT SETTINGS
+### EDIT SETTINGS in file: ./config
 POTBS_DIR="${HOME}/Games/PotBS"
 
 # If LEGACY client
 POTBSLEGACY=0
 
-#WINE="wine"
-WINE="${HOME}/.local/wine/wine-tkg/bin/wine"
+WINE="wine"
+#WINE="${HOME}/.local/wine/wine-tkg/bin/wine"
 
 WINEPREFIX="$HOME/.local/winepfx/PotBS"
 
@@ -53,9 +53,9 @@ jq="${BIN_DIR}/jq-linux64"
 hash="${BIN_DIR}/potbs_hash"
 patch4gb="${BIN_DIR}/4gb_patch.exe"
 
-#POTBS_VERSION_INSTALLED=""
-#POTBS_VERSION_SERVER=""
-#POTBS_UPDATE_REQUIRED=0
+POTBS_VERSION_INSTALLED=""
+POTBS_VERSION_SERVER=""
+CONFIG="${work_dir}/config"
 ######################################################
 
 ######################################################
@@ -153,36 +153,47 @@ patchinstall(){
 # return 1 - game NOT update
 # return 2 - error
 isGameUpdated(){
-    local serverVersion
 
-    if ! serverVersion=$(potbs_getServerVersion);then
-        echo_err "Not load server version"
+    if ! POTBS_VERSION_SERVER=$(potbs_getServerVersion);then
+        if [ "${GUI:-0}" -eq 0 ];then
+            echo_err "Not load server version"
+        fi
         return 2
     fi
 
-    if ! gameVersion=$(potbs_getlocalversion "$POTBS_DIR");then
-        echo_err "Not load game version"
+    if ! POTBS_VERSION_INSTALLED=$(potbs_getlocalversion "$POTBS_DIR");then
+        if [ "${GUI:-0}" -eq 0 ];then
+            echo_err "Not load game version"
+        fi
         return 2
     fi
 
-    if [ "${gameVersion}" == "${serverVersion}" ];then
-        #echo_ok "Update not required."
+    if [ "${POTBS_VERSION_INSTALLED}" == "${POTBS_VERSION_SERVER}" ];then
+        if [ "${GUI:-0}" -eq 0 ];then
+            echo_ok "Update not required."
+        fi
         return 0
     fi
 
-    echo "Check update version"
-    echo "Server Version: ${serverVersion}"
+    if [ "${GUI:-0}" -eq 0 ];then
+        echo "Check update version"
+        echo "Server Version: ${POTBS_VERSION_SERVER}"
+    fi
 
     currenthash=$(cat "${POTBS_DIR}/version.data")
-    buildhash=$(wget --quiet -O - "${POTBS_URL}/Builds/${serverVersion}/version.data")
+    buildhash=$(wget --quiet -O - "${POTBS_URL}/Builds/${POTBS_VERSION_SERVER}/version.data")
 
     if [ "${currenthash}" = "${buildhash}" ];then
-        #echo_ok "Current version last updated"
+        if [ "${GUI:-0}" -eq 0 ];then
+            echo_ok "Current version last updated"
+        fi
         return 0
     fi
 
-    echo "Installed version: ${gameVersion}"
-    echo "Update required"
+    if [ "${GUI:-0}" -eq 0 ];then
+        echo "Installed version: ${POTBS_VERSION_INSTALLED}"
+        echo "Update required"
+    fi
     return 1
 }
 
@@ -261,6 +272,9 @@ createwinepfx(){
     if [ "${ptch}" != "" ];then
         WINEPREFIX=${ptch}
     fi
+
+    cfg_save_param "${CONFIG}" "WINEPREFIX" "${WINEPREFIX}"
+
     echo "Init wine to ${WINEPREFIX}"
 
     if ! initWinePrefix;then
@@ -371,7 +385,7 @@ EOF
     if type "xdg-user-dir" >/dev/null 2>&1;then
         local desctopDir
         desctopDir=$(xdg-user-dir "DESKTOP")
-        cp -f "PotBS.desktop" "${desctopDir}"
+        mv -f "PotBS.desktop" "${desctopDir}"
     fi
 
 }
@@ -399,6 +413,11 @@ if ! [ -d "${CACHE_DIR}" ]; then
     mkdir -p "${CACHE_DIR}"
 fi
 
+
+if [ -f "$CONFIG" ];then
+    source "$CONFIG"
+fi
+
 if [ "${POTBSLEGACY:-0}" -eq 1 ]; then
     echo "${ClMagenta}Legacy client${Clreset}"
     POTBS_URL="$LEGACY_URL"
@@ -406,7 +425,8 @@ fi
 
 #Если запуск без параметров - запуск игры
 if [ "$#" -eq 0 ];then
-    rungame
+    #rungame
+    source "${DATA_DIR}/gui.sh"
     exit 0
 fi
 

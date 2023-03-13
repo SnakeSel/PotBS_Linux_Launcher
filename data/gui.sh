@@ -6,6 +6,68 @@ uiTitle="PotBS Linux Launcher"
 uiIcon="${DATA_DIR}/PotBS.png"
 
 
+ui_err(){
+    zenity --error --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --text="$*"
+}
+
+changeVersionUI(){
+    local ans
+    if ! ans=$(zenity --list --title="${uiTitle}" --window-icon="${uiIcon}" \
+            --width "400" --height "400" \
+            --text="Select game version:" \
+            --radiolist \
+            --column="" --column="Game version" \
+            1 "New" \
+            2 "Legacy" \
+        )
+    then
+        return
+    fi
+
+    case $ans in
+            "New") POTBSLEGACY=0;;
+            "Legacy") POTBSLEGACY=1;;
+            *) echo "$ans";;
+    esac
+
+    cfg_save_param "${CONFIG}" "POTBSLEGACY" "${POTBSLEGACY}"
+}
+
+changeFolderUI(){
+    while true; do
+        if ans=$(zenity --entry --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" \
+            --icon-name="wine" \
+            --text="Change game folder to:" \
+            --entry-text="${POTBS_DIR}" \
+            --extra-button "Explore" )
+        then
+            break
+        fi
+
+        case $ans in
+            "Explore") POTBS_DIR=$(zenity --file-selection --title="Choose a directory" --directory --filename="${POTBS_DIR}");;
+            "") return;;
+            *) break;;
+        esac
+    done
+
+    POTBS_DIR=$ans
+    cfg_save_param "${CONFIG}" "POTBS_DIR" "${POTBS_DIR}"
+
+}
+
+downloadUI(){
+    if ! POTBS_VERSION_SERVER=$(potbs_getServerVersion);then
+        ui_err "$gameVersion"
+        return 1
+    fi
+
+    #potbs_downloadGame "${POTBS_DIR}" "${POTBS_VERSION_SERVER}" | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --no-cancel
+    potbs_downloadGame "${POTBS_DIR}" "${POTBS_VERSION_SERVER}" 2>&1 | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --auto-kill
+
+    verifyUI
+}
+
 create_desktopUI(){
 cat << EOF > PotBS.desktop
 [Desktop Entry]
@@ -22,7 +84,7 @@ EOF
     if type "xdg-user-dir" >/dev/null 2>&1;then
         local desctopDir
         desctopDir=$(xdg-user-dir "DESKTOP")
-        cp -f "PotBS.desktop" "${desctopDir}"
+        mv -f "PotBS.desktop" "${desctopDir}"
     fi
 
 }
@@ -80,7 +142,18 @@ createPFXUI(){
 
     WINEPREFIX=$ans
 
-    # TODO: save new WINEPREFIX
+    if [ -f "${WINEPREFIX}/system.reg" ];then
+        if zenity --question --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" \
+             --text="Prefix exist\n\nRemove current PFX?"
+        then
+            rm -fr "${WINEPREFIX}"
+        else
+            return 0
+        fi
+
+    fi
+
+    cfg_save_param "${CONFIG}" "WINEPREFIX" "${WINEPREFIX}"
 
     initWinePrefix | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" \
         --width "400" \
@@ -92,6 +165,7 @@ createPFXUI(){
 }
 
 otherUI(){
+
     local ans
     if ! ans=$(zenity --list --title="${uiTitle}" --window-icon="${uiIcon}" \
             --width "400" --height "400" \
@@ -102,6 +176,9 @@ otherUI(){
             2 "Download updated locale files" \
             3 "Launch winecfg" \
             4 "Create desktop link" \
+            6 "Change game version" \
+            7 "Change game folder" \
+            8 "Recreate PFX" \
             9 "Debug" \
         )
     then
@@ -114,6 +191,9 @@ otherUI(){
             "Download updated locale files") downloadlangUI;;
             "Launch winecfg") env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${WINEPREFIX}" "${WINE}" winecfg;;
             "Create desktop link") create_desktopUI;;
+            "Change game version") changeVersionUI;;
+            "Change game folder") changeFolderUI;;
+            "Recreate PFX") createPFXUI;;
             *) echo "$ans";;
     esac
 
@@ -121,14 +201,23 @@ otherUI(){
 
 mainUI(){
     local buttons=()
+    local updateInfo=""
+    local legacy=""
+
+    if [ "${POTBSLEGACY:-0}" -eq 1 ]; then
+        legacy="Legacy version\n"
+    fi
 
     btn(){
         local notRun=false
+        local notDownload=false
+
         if [ -f "${POTBS_DIR}/PotBS.exe" ];then
             buttons+=("--extra-button" "Verify")
         else
             buttons+=("--extra-button" "Download")
             notRun=true
+            notDownload=true
         fi
 
         if [ ! -f "${WINEPREFIX}/system.reg" ];then
@@ -136,14 +225,21 @@ mainUI(){
             notRun=true
         fi
 
-        if ${notRun};then
+        if ${notDownload};then
             return
         fi
 
         if isGameUpdated;then
-            buttons+=("--extra-button" "Run")
+            if ! ${notRun};then
+                buttons+=("--extra-button" "Run")
+            fi
         else
-            buttons+=("--extra-button" "Update")
+            if [ "${POTBS_VERSION_INSTALLED}" == "Game files NOT found!" ];then
+                buttons+=("--extra-button" "Download")
+            else
+                buttons+=("--extra-button" "Update")
+                updateInfo="\nServer version: ${POTBS_VERSION_SERVER}\n\nNeed update game!"
+            fi
         fi
 
     }
@@ -154,7 +250,7 @@ mainUI(){
     # OK button return code=0, all others=1
     if ans=$(zenity --info --title="${uiTitle}" --window-icon="${uiIcon}" \
         --icon-name="wine" \
-        --text="Installed version: ${POTBS_VERSION_INSTALLED}\n\nGame dir: ${POTBS_DIR}\nGame PFX: ${WINEPREFIX}" \
+        --text="${legacy}Installed version: ${POTBS_VERSION_INSTALLED}${updateInfo}\n\nGame dir: ${POTBS_DIR}\nGame PFX: ${WINEPREFIX}" \
         --ok-label "Quit" \
         --extra-button "Other" \
         "${buttons[@]}")
@@ -170,8 +266,11 @@ mainUI(){
 
 type "zenity" >/dev/null 2>&1 || { echo >&2 "[ERR] No zenity found.";exit 1; }
 
-if ! POTBS_VERSION_INSTALLED=$(potbs_getlocalversion "$POTBS_DIR");then
-    echo_err "$POTBS_VERSION_INSTALLED"
+
+if ! [ -f "${POTBS_DIR}/PotBS.exe" ];then
+    if [ ! -f "${WINEPREFIX}/system.reg" ];then
+        changeVersionUI
+    fi
 fi
 
 while true; do
@@ -180,6 +279,7 @@ while true; do
     fi
 
     case $main in
+        "Download") downloadUI;;
         "Run") rungame;break;;
         "Create PFX") createPFXUI;;
         "Verify") verifyUI;;
@@ -188,5 +288,4 @@ while true; do
     esac
 
 done
-
 

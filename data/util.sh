@@ -80,7 +80,8 @@ cfg_save_param() {
     # обрезая текст после #
     alllines=( $(grep -n -e "${grep_param}=" -e "${grep_param} " "${1}" | cut -d"#" -f1) )
     IFS=$oldIFS
-    debug "$alllines"
+    echo_debug "${alllines[*]}"
+
     # перебираем все найденные строки
     for i in "${alllines[@]}"; do
         _line=$(echo "$i" | cut -d":" -f2)
@@ -92,9 +93,10 @@ cfg_save_param() {
         fi
     done
 
-    echo_debug "lineN: ${lineN}"
+    echo_debug "lineN: ${lineN:-}"
     # Если нет совпадения, то дописываем в файл
-    if [ -z "${lineN}" ];then
+    #if [ -z "${lineN}" ];then
+    if [ -z "${lineN:-}" ];then
          echo "${2}=${3}" >> "${1}"
     else
         # Заменяем всю строку на новую
