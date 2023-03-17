@@ -10,6 +10,21 @@ ui_err(){
     zenity --error --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --text="$*"
 }
 
+
+updateUI(){
+
+    if ! potbs_patchesInstall "${POTBS_DIR}" | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --auto-kill
+    then
+        case "$?" in
+            200) ui_err "Not found update patch";;
+            *) ui_err "Pathes not installed";;
+        esac
+        return 1
+    fi
+
+    verifyUI
+}
+
 changeVersionUI(){
     local ans
     if ! ans=$(zenity --list --title="${uiTitle}" --window-icon="${uiIcon}" \
@@ -229,7 +244,7 @@ mainUI(){
             return
         fi
 
-        if isGameUpdated 2>&1 >/dev/null;then
+        if isGameUpdated >/dev/null 2>&1;then
             if ! ${notRun};then
                 buttons+=("--extra-button" "Run")
             fi
@@ -281,6 +296,7 @@ while true; do
     case $main in
         "Download") downloadUI;;
         "Run") rungame;break;;
+        "Update") updateUI;;
         "Create PFX") createPFXUI;;
         "Verify") verifyUI;;
         "Other") otherUI;;

@@ -139,11 +139,11 @@ dialog_yesno(){
 patchinstall(){
     echo "${ClMagenta}Install game pathes...${Clreset}"
 
-    if [ -n "${1}" ];then
+    if [ -n "${1:-}" ];then
         echo "Manual select update to ${1}"
     fi
 
-    if ! potbs_patchesInstall "${POTBS_DIR}" "$1";then
+    if ! potbs_patchesInstall "${POTBS_DIR}" "${1:-}";then
         case "$?" in
             200) echo_err "Not found update patch";;
             *) echo_err "Pathes not installed";;
@@ -202,7 +202,7 @@ checkGameFiles(){
         return 0
     fi
 
-    cat "$CORRUPTEDFILES"
+    #cat "$CORRUPTEDFILES"
 
     while true; do
         read -r -p "Download corrupted file? (y\n):" yn
@@ -449,7 +449,6 @@ case "$1" in
                 else
                     patchinstall
                 fi
-                checklocalfiles
                 break;;
             [Nn]* ) break;;
             * ) echo "Please answer yes or no.";;

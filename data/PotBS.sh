@@ -338,41 +338,55 @@ potbs_patchesInstall(){
         local pathAdd
 
         pathDel=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==1) | .RelativePath')
-        debug "pathDel: ${pathDel}"
+        echo_debug "pathDel: ${pathDel}"
 
         pathUpdate=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==2) | .RelativePath')
-        debug "pathUpdate: $pathUpdate"
+        echo_debug "pathUpdate: $pathUpdate"
 
         pathAdd=$(echo "${patchlist}" | "${jq}" -r '.["Entries"] | .[] | select(.Operation==4) | .RelativePath')
-        debug "pathAdd: $pathAdd"
+        echo_debug "pathAdd: $pathAdd"
 
         # echo '''
 
         echo "Apply the patch ..."
+        local totalLines
+        local i
 
         echo "Remove deleted files..."
+        totalLines=$(echo "${pathDel}" | wc -l)
+        i=0
         while read -r LINE;do
             if [ "$LINE" == "" ];then
                 continue
             fi
+            if [ "${GUI:-0}" -eq 1 ];then echo "$(($i*100/${totalLines}))";echo "# Remove: ${LINE}";fi
             rm -f "${gameDir}/${LINE}"
+            ((++i))
         done < <(printf '%s\n' "${pathDel}")
 
-            echo "Remove old and download updated files"
-            while read -r fullfile;do
-                if [ "$fullfile" == "" ];then
-                    continue
-                fi
-                filedir=$(dirname "$fullfile")
-                rm -f "${gameDir}/${fullfile}"
-                wget -c -nH -q --show-progress -P "${gameDir}/${filedir}" "${POTBS_URL}/Builds/${patchTo}/${fullfile}"
-            done < <(printf '%s\n' "$pathUpdate")
+        echo "Remove old and download updated files"
+        totalLines=$(echo "${pathUpdate}" | wc -l)
+        i=0
+        while read -r fullfile;do
+            if [ "$fullfile" == "" ];then
+                continue
+            fi
+            filedir=$(dirname "$fullfile")
+            if [ "${GUI:-0}" -eq 1 ];then echo "$(($i*100/${totalLines}))";echo "# Download: ${fullfile}";fi
+            rm -f "${gameDir}/${fullfile}"
+            wget -c -nH -q --show-progress -P "${gameDir}/${filedir}" "${POTBS_URL}/Builds/${patchTo}/${fullfile}"
+            ((++i))
+        done < <(printf '%s\n' "$pathUpdate")
 
-            echo "Download added files"
-            while read -r fullfile;do
-                filedir=$(dirname "$fullfile")
-                wget -c -nH -q --show-progress -P "${gameDir}/${filedir}" "${POTBS_URL}/Builds/${patchTo}/${fullfile}"
-            done < <(printf '%s\n' "${pathAdd}")
+        echo "Download added files"
+        totalLines=$(echo "${pathAdd}" | wc -l)
+        i=0
+        while read -r fullfile;do
+            filedir=$(dirname "$fullfile")
+            if [ "${GUI:-0}" -eq 1 ];then echo "$(($i*100/${totalLines}))";echo "# Download: ${fullfile}";fi
+            wget -c -nH -q --show-progress -P "${gameDir}/${filedir}" "${POTBS_URL}/Builds/${patchTo}/${fullfile}"
+            ((++i))
+        done < <(printf '%s\n' "${pathAdd}")
 
     }
 
@@ -387,7 +401,7 @@ potbs_patchesInstall(){
         POTBS_URL="$LEGACY_URL"
     fi
 
-    if [ -n "${2}" ];then
+    if [ -n "${2:-}" ];then
         echo "Manual select update to ${2}"
         POTBS_VERSION_SERVER="${2}"
     else
@@ -418,7 +432,7 @@ potbs_patchesInstall(){
 
     # before we install all the patches.
     while [ "${POTBS_VERSION_INSTALLED}" != "${POTBS_VERSION_SERVER}" ];do
-        if [ -n "${2}" ];then
+        if [ -n "${2:-}" ];then
             echo "Manual select update to ${2}"
             patchTo="${2}"
         else
@@ -448,12 +462,13 @@ potbs_patchesInstall(){
         patchName="${POTBS_VERSION_INSTALLED}_${patchTo}"
         #debug "patchName: ${patchName}"
 
-        if ! installPatch "$patchName";then
+        if ! installPatch "$patchName" 2>&1;then
             echo "Can not install $patchName"
             return 1
         fi
         #echo ""
         POTBS_VERSION_INSTALLED=${patchTo}
+        if [ "${GUI:-0}" -eq 1 ];then echo "100";echo "# Game updated to ${patchTo}";fi
 
     done
 }
