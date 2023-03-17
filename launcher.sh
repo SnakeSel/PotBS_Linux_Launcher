@@ -7,7 +7,7 @@ set -eu
 # Author: SnakeSel
 # git: https://github.com/SnakeSel/PotBS_Linux_Launcher
 
-version=20230311
+version=20230317
 
 ### Script Directory
 work_dir=$(dirname "$(readlink -e "$0")")
@@ -102,23 +102,30 @@ verifying(){
 
 }
 
-# $1 title
-# $2 text
+# $1 text
+# $2 title
 # return: 0 yes; 1 no
 dialog_yesno(){
+    if [ "$#" -eq 0 ];then
+        return 1
+    fi
+
+    local text="${1:-}"
+    local title="${2:-PotBS}"
+
     if (type zenity >/dev/null 2>&1);then
-        zenity --question --title="$1" --text "$2" --no-wrap --ok-label "Yes" --cancel-label "No"
+        zenity --question --title="$title" --text "$text" --no-wrap --ok-label "Yes" --cancel-label "No"
         return $?
     fi
 
     if (type whiptail >/dev/null 2>&1);then
-        whiptail --title "$1" --yesno "${2}" 10 90
+        whiptail --title "$title" --yesno "${text}" 10 90
         return $?
     fi
 
     while true; do
-        echo "$1"
-        read -r -p "$(echo -e "$2") (y\n):" yn
+        echo "$title"
+        read -r -p "$(echo -e "$text") (y\n):" yn
             case $yn in
                 [Yy]* ) return 0;;
                 [Nn]* ) return 1;;
@@ -155,45 +162,34 @@ patchinstall(){
 isGameUpdated(){
 
     if ! POTBS_VERSION_SERVER=$(potbs_getServerVersion);then
-        if [ "${GUI:-0}" -eq 0 ];then
-            echo_err "Not load server version"
-        fi
+        echo_err "Not load server version"
         return 2
     fi
 
     if ! POTBS_VERSION_INSTALLED=$(potbs_getlocalversion "$POTBS_DIR");then
-        if [ "${GUI:-0}" -eq 0 ];then
-            echo_err "Not load game version"
-        fi
+        echo_err "Not load game version"
         return 2
     fi
 
     if [ "${POTBS_VERSION_INSTALLED}" == "${POTBS_VERSION_SERVER}" ];then
-        if [ "${GUI:-0}" -eq 0 ];then
-            echo_ok "Update not required."
-        fi
+        echo_ok "Update not required."
         return 0
     fi
 
-    if [ "${GUI:-0}" -eq 0 ];then
-        echo "Check update version"
-        echo "Server Version: ${POTBS_VERSION_SERVER}"
-    fi
+    echo "Check update version"
+    echo "Server Version: ${POTBS_VERSION_SERVER}"
 
     currenthash=$(cat "${POTBS_DIR}/version.data")
     buildhash=$(wget --quiet -O - "${POTBS_URL}/Builds/${POTBS_VERSION_SERVER}/version.data")
 
     if [ "${currenthash}" = "${buildhash}" ];then
-        if [ "${GUI:-0}" -eq 0 ];then
-            echo_ok "Current version last updated"
-        fi
+        echo_ok "Current version last updated"
         return 0
     fi
 
-    if [ "${GUI:-0}" -eq 0 ];then
-        echo "Installed version: ${POTBS_VERSION_INSTALLED}"
-        echo "Update required"
-    fi
+    echo "Installed version: ${POTBS_VERSION_INSTALLED}"
+    echo "Update required"
+
     return 1
 }
 
@@ -425,8 +421,8 @@ fi
 
 #Если запуск без параметров - запуск игры
 if [ "$#" -eq 0 ];then
-    #rungame
-    source "${DATA_DIR}/gui.sh"
+    rungame
+    #source "${DATA_DIR}/gui.sh"
     exit 0
 fi
 

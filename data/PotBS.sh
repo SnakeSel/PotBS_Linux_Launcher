@@ -161,11 +161,10 @@ potbs_downloadGame(){
     #wget -c -r -nH --cut-dirs=${_cutdirs} --no-parent -q --show-progress -P "${gameDir}" --reject="index.html*" "${POTBS_URL}/Builds/${gameVersion}/"
     cmd="wget -c -r -nH --cut-dirs=${_cutdirs} --no-parent -q --show-progress -P \"${gameDir}\" --reject=\"index.html*\" \"${POTBS_URL}/Builds/${gameVersion}/\""
     if [ "${GUI:-0}" -eq 1 ];then
-        #cmd="wget -c -r -nH --cut-dirs=${_cutdirs} --no-parent -P \"${gameDir}\" --reject=\"index.html*\" \"${POTBS_URL}/Builds/${gameVersion}/\"  2>&1 | sed -u 's/.* \([0-9]\+%\)\ \+\([0-9.]\+.\) \(.*\)/\1\n# Downloading at \2\/s, ETA \3/'"
         cmd+=' 2>&1 | sed -u -r "s/([^ ]+) +([0-9]+)%+(.*)/\2\n# Download: \1/"'
     fi
 
-    echo $cmd 2>&1
+    #echo $cmd 2>&1
     if eval "$cmd";then
         return 0
     else

@@ -13,11 +13,11 @@ ui_err(){
 changeVersionUI(){
     local ans
     if ! ans=$(zenity --list --title="${uiTitle}" --window-icon="${uiIcon}" \
-            --width "400" --height "400" \
+            --width "400" --height "200" \
             --text="Select game version:" \
             --radiolist \
             --column="" --column="Game version" \
-            1 "New" \
+            1 "Live" \
             2 "Legacy" \
         )
     then
@@ -25,7 +25,7 @@ changeVersionUI(){
     fi
 
     case $ans in
-            "New") POTBSLEGACY=0;;
+            "Live") POTBSLEGACY=0;;
             "Legacy") POTBSLEGACY=1;;
             *) echo "$ans";;
     esac
@@ -229,7 +229,7 @@ mainUI(){
             return
         fi
 
-        if isGameUpdated;then
+        if isGameUpdated 2>&1 >/dev/null;then
             if ! ${notRun};then
                 buttons+=("--extra-button" "Run")
             fi
