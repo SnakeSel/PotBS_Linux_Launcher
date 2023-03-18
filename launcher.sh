@@ -419,7 +419,6 @@ if ! [ -d "${CACHE_DIR}" ]; then
     mkdir -p "${CACHE_DIR}"
 fi
 
-
 if [ -f "$CONFIG" ];then
     source "$CONFIG"
 fi

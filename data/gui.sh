@@ -207,9 +207,9 @@ otherUI(){
     local ans
     if ! ans=$(zenity --list --title="${uiTitle}" --window-icon="${uiIcon}" \
             --width "400" --height "400" \
-            --text="Create new wineprefix in:" \
+            --text="Select command to launch:" \
             --radiolist \
-            --column="" --column="Description" \
+            --column="" --column="Command" \
             1 "Install DXVK" \
             2 "Download updated locale files" \
             3 "Launch winecfg" \
@@ -217,14 +217,14 @@ otherUI(){
             6 "Change game version" \
             7 "Change game folder" \
             8 "Recreate PFX" \
-            9 "Debug" \
+            9 "Debug on" \
         )
     then
         return
     fi
 
     case $ans in
-            "Debug") DEBUGGING=1;;
+            "Debug on") DEBUGGING=1;;
             "Install DXVK") install_dxvk | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --text="install DXVK..." --no-cancel --auto-close;;
             "Download updated locale files") downloadlangUI;;
             "Launch winecfg") env WINEARCH="${WINEARCH}" WINEDEBUG="-all" WINEPREFIX="${WINEPREFIX}" "${WINE}" winecfg;;

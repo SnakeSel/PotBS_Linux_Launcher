@@ -29,7 +29,7 @@ command:
  - dxvk - install dxvk
  - desc - create desktop entry
  - cfg - launch winecfg
- - gui - launch GUI mode (develop)
+ - gui - launch GUI mode
 
 #### Example clean install:
 1. Create new wineprefix and installing dependencies: `./launcher.sh n`
