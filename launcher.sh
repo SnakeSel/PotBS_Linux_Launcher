@@ -37,7 +37,7 @@ POTBSLEGACY=0
 WINE="wine"
 #WINE="${HOME}/.local/wine/wine-tkg/bin/wine"
 
-WINEPREFIX="$HOME/.local/winepfx/PotBS"
+WINEPREFIX="${HOME}/.local/winepfx/PotBS"
 
 # win64 | win32
 WINEARCH=win64
@@ -135,6 +135,16 @@ dialog_yesno(){
 
 }
 
+isMemoryErr(){
+    local log
+    log=$(ls -t "${HOME}/Pirates of the Burning Sea/log"|head -n 1)
+    if grep -q 'ERROR Memory: memory allocation failed for pool Main.Default' "${HOME}/Pirates of the Burning Sea/log/$log";then
+        return 0
+    else
+        return 1
+    fi
+    return 1
+}
 
 patchinstall(){
     echo "${ClMagenta}Install game pathes...${Clreset}"

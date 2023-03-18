@@ -11,6 +11,29 @@ ui_err(){
 }
 
 
+memoryErrUI(){
+
+    if echo "ERROR Memory: memory allocation failed for pool Main.Default
+
+Add or replace params in file \"pirates_local.ini\":
+[MemoryPools]
+;; size in MB
+preSize_Bootstrap=2
+preSize_Default=256
+preSize_Image=486
+preSize_Vertex=128
+preSize_Audio=64
+preSize_Room=486
+preSize_UI=64
+preSize_Anim=486" | zenity --text-info  --title="${uiTitle}" --window-icon="${uiIcon}" \
+        --ok-label="Dont show again" --cancel-label="OK" \
+        --width "450" --height "400"
+    then
+        cfg_save_param "${CONFIG}" "SHOWMEMERRINFO" "0"
+    fi
+
+}
+
 updateUI(){
 
     if ! potbs_patchesInstall "${POTBS_DIR}" | zenity --progress --title="${uiTitle}" --window-icon="${uiIcon}" --width "400" --auto-kill
@@ -285,6 +308,12 @@ type "zenity" >/dev/null 2>&1 || { echo >&2 "[ERR] No zenity found.";exit 1; }
 if ! [ -f "${POTBS_DIR}/PotBS.exe" ];then
     if [ ! -f "${WINEPREFIX}/system.reg" ];then
         changeVersionUI
+    fi
+fi
+
+if [ "${SHOWMEMERRINFO:-1}" -eq 1 ]; then
+    if isMemoryErr;then
+        memoryErrUI
     fi
 fi
 
